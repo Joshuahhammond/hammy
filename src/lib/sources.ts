@@ -91,6 +91,16 @@ export const SOURCES: Source[] = [
   { id: "peppermayo", name: "Peppermayo", domain: "peppermayo.com", vibe: "Aussie it-girl street and going-out; mid-range" },
   { id: "whitefox", name: "White Fox", domain: "whitefoxboutique.com", vibe: "oversized hoodie sets and street-casual; mid-range" },
   { id: "lioness", name: "Lioness", domain: "lionessfashion.com", vibe: "edgy tailored street style, corp-core minis; affordable-mid" },
+  // ——— comfort / lounge ———
+  { id: "lounge", name: "Lounge", domain: "loungeunderwear.com", vibe: "soft ribbed lounge sets and intimates; mid-range" },
+  { id: "eberjey", name: "Eberjey", domain: "eberjey.com", vibe: "the softest pajama sets, elevated sleepwear; premium" },
+  { id: "barefootdreams", name: "Barefoot Dreams", domain: "barefootdreams.com", vibe: "famously cozy CozyChic knits, cardigans and blankets-you-wear; mid-premium" },
+  { id: "lunya", name: "Lunya", domain: "lunya.co", vibe: "washable silk and pima sleepwear, refined lounge; premium" },
+  { id: "aviatornation", name: "Aviator Nation", domain: "aviatornation.com", vibe: "retro 70s California sweats and hoodies, rainbow stripes; premium" },
+  { id: "richerpoorer", name: "Richer Poorer", domain: "richer-poorer.com", vibe: "elevated everyday sweats and tees, muted tones; mid-range" },
+  { id: "splendid", name: "Splendid", domain: "splendid.com", vibe: "buttery-soft everyday knits and lounge; mid-range" },
+  { id: "krushkandy", name: "Krush Kandy", domain: "krushkandy.com", vibe: "cozy boutique hoodie-and-short sets, warm tones; affordable" },
+  { id: "jluxlabel", name: "JLUXLABEL", domain: "jluxlabel.com", vibe: "chic comfort sets, knit co-ords and resort glam; mid-range" },
 ];
 
 export const sourceById = (id: string) => SOURCES.find((s) => s.id === id);
