@@ -645,6 +645,17 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     put(others[0], { left: 82, top: 64, width: 14, height: 12, z: 6, rotate: 3, alignX: "right" });
     put(others[1], { left: 2, top: 64, width: 13, height: 11, z: 6, rotate: -4, alignX: "left" });
 
+    // Invariant: never two belts or two sunglasses on one canvas — a
+    // duplicate kind reads as a mistake; the extra lives in the strip
+    const seenKind = new Set<string>();
+    for (let i = placed.length - 1; i >= 0; i--) {
+      const k = accKind(placed[i].item);
+      if (k === "belt" || k === "sunglasses") {
+        if (seenKind.has(k)) placed.splice(i, 1);
+        else seenKind.add(k);
+      }
+    }
+
     return autoscale(placed);
   }
 }

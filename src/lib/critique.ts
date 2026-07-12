@@ -124,7 +124,7 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
       const placed = composeLook(items);
       if (placed.length < 3) continue;
 
-      for (let round = 0; round < 2; round++) {
+      for (let round = 0; round < 3; round++) {
         const png = await composeBoardPng(placed);
         const legend = placed
           .map(({ item }, i) => `${i}. ${item.kind || item.category}: ${item.name}`)
@@ -160,8 +160,8 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
           if (!p) continue;
           const s = p.slot;
           const scale = Math.min(1.4, Math.max(0.7, adj.scale || 1));
-          const cx = s.left + s.width / 2 + Math.max(-20, Math.min(20, adj.dx || 0));
-          const cy = s.top + s.height / 2 + Math.max(-20, Math.min(20, adj.dy || 0));
+          const cx = s.left + s.width / 2 + Math.max(-30, Math.min(30, adj.dx || 0));
+          const cy = s.top + s.height / 2 + Math.max(-30, Math.min(30, adj.dy || 0));
           s.width *= scale;
           s.height *= scale;
           s.left = Math.min(97 - s.width, Math.max(3, cx - s.width / 2));

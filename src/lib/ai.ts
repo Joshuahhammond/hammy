@@ -22,7 +22,12 @@ const CELEB_STYLIST_SYSTEM =
   "Your taste is ELEVATED BOUTIQUE, never plain: default to pieces with a point of view — texture, " +
   "print, drape, puff sleeves, statement buttons, interesting necklines, hardware — the modern cute " +
   "energy of a Bohme or Nordstrom contemporary floor. A plain tank or basic trouser earns its place " +
-  "only as a deliberate foil to a statement piece, or when the brief asks for minimalist.";
+  "only as a deliberate foil to a statement piece, or when the brief asks for minimalist. " +
+  "Craft rules for a GREAT outfit: exactly one hero piece per look (everything else supports it); " +
+  "balance silhouettes (an oversized top over a slim bottom, a fluid skirt under a fitted knit — " +
+  "never baggy-on-baggy or tight-on-tight); vary texture within the palette (knit against silk, " +
+  "suede against crisp cotton); and make every look occasion-coherent — a wearable, photograph-ready " +
+  "outfit, not a collection of nice items.";
 
 const PieceSchema = z.object({
   role: z
@@ -139,7 +144,7 @@ export async function matchPiecesToProducts(
     messages: [
       {
         role: "user",
-        content: `You designed this look:\n${specSummary}\n\nReal, in-stock candidates (each tagged with the piece it could fill):\n${candidateLines}\n\nFor each design piece, choose the single candidate that best honors the design. Never choose two candidates that are near-duplicates. HARD RULE: the candidate must actually BE that kind of piece — a polo shirt can never fill a shoes slot.\n\nTwo tiers of strictness:\n- GARMENTS (tops, bottoms, dresses, outerwear): silhouette and color fidelity matter — omit the piece if nothing genuinely matches the design.\n- ACCESSORIES & SHOES (shoes, bag, belt, sunglasses, jewelry): a finished board beats a perfect match — choose the CLOSEST available candidate of the right type even if the details differ from the design, and say in the note how to make it work. Only omit when no candidate of that type exists at all.
+        content: `You designed this look:\n${specSummary}\n\nReal, in-stock candidates (each tagged with the piece it could fill):\n${candidateLines}\n\nFor each design piece, choose the single candidate that best honors the design. Never choose two candidates that are near-duplicates. HARD RULE: the candidate must actually BE that kind of piece — a polo shirt can never fill a shoes slot — and the garment TYPE must match exactly: trousers never fill a shorts piece, shorts never fill trousers, a skirt never fills pants, a crewneck never fills a button-up. Omit rather than bend silhouette.\n\nTwo tiers of strictness:\n- GARMENTS (tops, bottoms, dresses, outerwear): silhouette and color fidelity matter — omit the piece if nothing genuinely matches the design.\n- ACCESSORIES & SHOES (shoes, bag, belt, sunglasses, jewelry): a finished board beats a perfect match — choose the CLOSEST available candidate of the right type even if the details differ from the design, and say in the note how to make it work. Only omit when no candidate of that type exists at all.
 
 PALETTE DISCIPLINE (overrides everything except the type rule): the collection's palette is sacred. Judge each candidate's color from its title/type/tags. A GARMENT whose evident color sits outside the designed piece's color family breaks the board — omit instead. An ACCESSORY should sit inside the palette or stay neutral (black, cream, tan, leather, tortoise, the palette's metal); NEVER introduce a saturated color the palette doesn't contain.`,
       },
@@ -314,7 +319,7 @@ export type BestImage = { index: number; flat: boolean };
  * without a flat shot stay off the collage canvas.
  */
 const PICK_PROMPT =
-  "These are photos of ONE clothing product, labeled Image 0..N. Pick the best photo to cut out for a stylist's collage. Preference order: (1) ghost/invisible-mannequin shot, (2) flat-lay, (3) plain product still, (4) on-model ONLY if no product-only shot exists. Requirements: full garment visible, front-facing, uncropped. REJECT fabric/detail close-ups, back views, folded stacks, packaging, and any image whose color/pattern differs from Image 0 (variant colorways). Ties go to the lower index. Set flat=true only if the chosen image shows the product with no person wearing it; treat a visible mannequin with limbs, head, or torso the same as a model (flat=false). If every image has a model, pick the plainest, most frontal full-body one and set flat=false.";
+  "These are photos of ONE clothing product, labeled Image 0..N. Pick the best photo to cut out for a stylist's collage. Preference order: (1) ghost/invisible-mannequin shot, (2) flat-lay, (3) plain product still, (4) on-model ONLY if no product-only shot exists. Requirements: full garment visible, front-facing, uncropped. REJECT fabric/detail close-ups, back views, packaging, and any image whose color/pattern differs from Image 0 (variant colorways). NEVER pick a folded or stacked garment when any unfolded view exists — folded shots read as squares on a collage. Ties go to the lower index. Set flat=true only if the chosen image shows the product with no person wearing it; treat a visible mannequin with limbs, head, or torso the same as a model (flat=false). If every image has a model, pick the plainest, most frontal full-body one and set flat=false.";
 
 async function pickFrom(imageUrls: string[]): Promise<BestImage | null> {
   const response = await client.messages.parse({
