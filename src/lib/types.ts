@@ -85,6 +85,7 @@ export type SharedLookbook = {
     name: string;
     brand: string;
     category: string;
+    kind?: string;
     price_cents: number | null;
     product_url: string;
     image_url: string;

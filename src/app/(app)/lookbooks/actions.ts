@@ -341,6 +341,7 @@ async function runLookbookGeneration({
             name: pick.product.title.slice(0, 200),
             brand: pick.product.vendor || pick.product.storeName,
             category: pick.category,
+            kind: flatPieces[pick.pieceIdx]?.role ?? "",
             price_cents: pick.product.price !== null ? Math.round(pick.product.price * 100) : null,
             product_url: pick.product.url,
             image_url: imageUrl,

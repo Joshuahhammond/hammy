@@ -47,6 +47,7 @@ export default async function SharedLookbookPage({ params }: Props) {
       color_hex: i.color_hex,
       note: i.note,
       look_no: i.look_no,
+      kind: i.kind,
       aspect: isCutout(i.image_url) ? await probeAspect(i.image_url) : null,
     }))
   );

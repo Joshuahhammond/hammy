@@ -17,6 +17,8 @@ export type LookItem = {
   look_no?: number;
   /** cutout image aspect ratio (w/h), probed at render time */
   aspect?: number | null;
+  /** designed role from generation ("sunglasses", "belt"...) — beats title guessing */
+  kind?: string;
 };
 
 /** Group by explicit outfit numbers when present, else fall back to recipe */
@@ -83,12 +85,17 @@ export function groupIntoLooks(items: LookItem[]): LookItem[][] {
 }
 
 // Accessory subtypes place differently (bag beside the column, belt at the
-// waist, sunglasses/jewelry sprinkled top-left) — classify by name
-export function accKind(name: string): "bag" | "belt" | "sunglasses" | "jewelry" | "other" {
-  if (/bag|tote|clutch|crossbody|crescent|satchel|hobo/i.test(name)) return "bag";
-  if (/belt/i.test(name)) return "belt";
-  if (/sunglass|eyewear|frames/i.test(name)) return "sunglasses";
-  if (/earring|necklace|ring|bracelet|hoop|pendant|choker|chain|watch|cuff|jewel/i.test(name)) return "jewelry";
+// waist, sunglasses/jewelry sprinkled top-left). The designed role (kind)
+// wins when present — product titles like "The Legend in Tokyo Tortoise"
+// say nothing about being sunglasses.
+export function accKind(
+  i: Pick<LookItem, "name" | "kind">
+): "bag" | "belt" | "sunglasses" | "jewelry" | "other" {
+  const text = `${i.kind ?? ""} ${i.name}`;
+  if (/bag|tote|clutch|crossbody|crescent|satchel|hobo/i.test(text)) return "bag";
+  if (/belt/i.test(text)) return "belt";
+  if (/sunglass|eyewear|frames/i.test(text)) return "sunglasses";
+  if (/earring|necklace|ring|bracelet|hoop|pendant|choker|chain|watch|cuff|jewel/i.test(text)) return "jewelry";
   return "other";
 }
 
@@ -227,7 +234,7 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   // Miscategorized trinkets must never claim a garment column — a
   // mislabeled "top" earring in a 40%-wide column reads absurd.
   const isSmallAcc = (i: LookItem) =>
-    ["jewelry", "sunglasses", "belt"].includes(accKind(i.name));
+    ["jewelry", "sunglasses", "belt"].includes(accKind(i));
   const dresses = withImage
     .filter((i) => i.category === "dresses" && !isSmallAcc(i))
     .slice(0, 2);
@@ -242,10 +249,10 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     (i) =>
       !dresses.includes(i) && !heads.includes(i) && !bottoms.includes(i) && !shoes.includes(i)
   );
-  const bags = rest.filter((i) => accKind(i.name) === "bag").slice(0, 2);
-  const belts = rest.filter((i) => accKind(i.name) === "belt").slice(0, 1);
-  const sunnies = rest.filter((i) => accKind(i.name) === "sunglasses").slice(0, 1);
-  const jewelry = rest.filter((i) => accKind(i.name) === "jewelry").slice(0, 3);
+  const bags = rest.filter((i) => accKind(i) === "bag").slice(0, 2);
+  const belts = rest.filter((i) => accKind(i) === "belt").slice(0, 1);
+  const sunnies = rest.filter((i) => accKind(i) === "sunglasses").slice(0, 1);
+  const jewelry = rest.filter((i) => accKind(i) === "jewelry").slice(0, 3);
   // Overflow garments don't belong in the rotated corner trinket slots —
   // and neither do surplus trinkets (a second belt at a canvas edge reads
   // as a mistake; it lives in the thumbnail strip instead)
@@ -323,8 +330,11 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
         slots[bi].align = undefined;
       }
     }
-    assigned.forEach((item, i) => put(item, slots[i]));
-    return autoscale(placed);
+    // Templates place garments; accessories anchor anatomically below
+    assigned.forEach((item, i) => {
+      if (["head", "bottom", "dress"].includes(template!.slots[i].kind)) put(item, slots[i]);
+    });
+    return anchorAndScale();
   }
 
   // ---- Garment columns -------------------------------------------------
@@ -368,37 +378,105 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     }
   });
 
-  // ---- Shoes: wide and substantial, overlapping the trouser hems -------
-  put(shoes[0], { left: 14, top: 78, width: 28, height: 16, z: 6, rotate: 0, align: "bottom" });
-  put(shoes[1], { left: 50, top: 80, width: 26, height: 14, z: 7, rotate: 0, align: "bottom" });
+  return anchorAndScale();
 
-  // ---- Satellites: bags overlay column edges (reference style) ---------
-  put(bags[0], { left: 76, top: 52, width: 20, height: 20, z: 5, rotate: 0, alignX: "right" });
-  put(bags[1], { left: 2, top: 52, width: 18, height: 18, z: 5, rotate: 0, alignX: "left" });
-  // Belt reads right at a waistline, not on a shirt chest: center gap at
-  // waist height on multi-column boards, beside the column waist on single
-  put(belts[0], n >= 2
-    ? { left: 41, top: 52, width: 16, height: 11, z: 6, rotate: -8 }
-    : { left: 58, top: 30, width: 16, height: 10, z: 6, rotate: -8 });
+  /**
+   * Anatomical accessory pass: the board reads top-down like a dressed
+   * figure — sunglasses above the collar, necklace ON the neckline, watch
+   * and bracelets at the cuff, belt on the waistband junction, shoes under
+   * the trouser hem, bag at the hip. Anchors are computed from the primary
+   * column's TRUE rendered rectangles, so overlays land on pixels.
+   */
+  function anchorAndScale(): Array<{ item: LookItem; slot: Slot }> {
+    truthBoxes(placed); // garment rects become anchor truth (idempotent)
 
-  // Trinkets live in the gaps between column tops when there are columns
-  // to gap; on single-column boards they stack the left rail. Necklace and
-  // chain shots are mostly empty space, so jewelry boxes stay ≥10% wide.
-  if (n >= 2) {
-    put(sunnies[0], { left: 22, top: 0, width: 14, height: 8, z: 6, rotate: -5 });
-    put(jewelry[0], { left: 54, top: 0, width: 12, height: 11, z: 6, rotate: 0 });
-    put(jewelry[1], { left: 2, top: 38, width: 11, height: 10, z: 6, rotate: 4, alignX: "left" });
-    put(jewelry[2], { left: 86, top: 33, width: 11, height: 10, z: 6, rotate: -3, alignX: "right" });
-  } else {
-    put(sunnies[0], { left: 4, top: 2, width: 16, height: 9, z: 6, rotate: -5, alignX: "left" });
-    put(jewelry[0], { left: 4, top: 14, width: 12, height: 11, z: 6, rotate: 0, alignX: "left" });
-    put(jewelry[1], { left: 4, top: 28, width: 10, height: 9, z: 6, rotate: 4, alignX: "left" });
-    put(jewelry[2], { left: 86, top: 33, width: 11, height: 10, z: 6, rotate: -3, alignX: "right" });
+    const rectOf = (it?: LookItem) =>
+      it ? placed.find((p) => p.item === it)?.slot : undefined;
+    const dress0 = dresses[0];
+    const topRect = rectOf(heads[0]) ?? rectOf(dress0);
+    const botRect = rectOf(bottoms[0]) ?? rectOf(dress0);
+    const axis = topRect
+      ? topRect.left + topRect.width / 2
+      : botRect
+        ? botRect.left + botRect.width / 2
+        : 50;
+    // Waistband line: top of the trousers, or ~42% down a dress
+    const junctionY =
+      botRect && botRect !== topRect
+        ? botRect.top + 2
+        : topRect
+          ? topRect.top + topRect.height * (botRect === topRect ? 0.42 : 1)
+          : 55;
+    const hemY = botRect ? botRect.top + botRect.height : 78;
+
+    // The accessory SPINE: references run accessories down the widest
+    // gutter between garment columns in dressing order — sunglasses,
+    // jewelry, watch, belt, shoes. Column representatives: each head,
+    // each dress, and any bottom without a head above it.
+    const reps = [
+      ...heads.map((h) => rectOf(h)),
+      ...dresses.map((d) => rectOf(d)),
+      ...bottoms.filter((_, i) => !heads[i]).map((b) => rectOf(b)),
+    ]
+      .filter((r): r is Slot => Boolean(r))
+      .sort((a, b) => a.left + a.width / 2 - (b.left + b.width / 2));
+    let spineX = topRect ? Math.min(96, topRect.left + topRect.width + 8) : 50;
+    if (reps.length >= 2) {
+      let bestGap = -Infinity;
+      for (let i = 0; i < reps.length - 1; i++) {
+        const gap = reps[i + 1].left - (reps[i].left + reps[i].width);
+        if (gap > bestGap) {
+          bestGap = gap;
+          spineX = (reps[i].left + reps[i].width + reps[i + 1].left) / 2;
+        }
+      }
+    }
+
+    const jewelText = (j: LookItem) => `${j.kind ?? ""} ${j.name}`;
+    const necks = jewelry.filter((j) =>
+      /necklace|pendant|choker|chain|lariat/i.test(jewelText(j))
+    );
+    const wrist = jewelry.filter(
+      (j) => !necks.includes(j) && /watch|bracelet|bangle|cuff|\bring/i.test(jewelText(j))
+    );
+    const ears = jewelry.filter((j) => !necks.includes(j) && !wrist.includes(j));
+
+    // Top of spine: sunglasses, then earrings beside them
+    put(sunnies[0], { left: spineX - 7, top: 1, width: 14, height: 8, z: 8, rotate: -5 });
+    put(ears[0], { left: spineX + 8, top: 2, width: 8, height: 8, z: 8, rotate: 3 });
+    // Necklace sits ON the primary top's neckline; a second one holds the spine
+    put(necks[0], topRect
+      ? { left: axis - 6, top: topRect.top + 1, width: 12, height: 12, z: 8, rotate: 0, align: "top" }
+      : { left: spineX - 6, top: 11, width: 12, height: 12, z: 8, rotate: 0 });
+    put(necks[1], { left: spineX - 5, top: 12, width: 11, height: 11, z: 8, rotate: 0 });
+    // Mid-spine: watch / bracelets at cuff height
+    wrist.slice(0, 2).forEach((w, i) =>
+      put(w, { left: spineX - 5, top: junctionY - 22 + i * 11, width: 9, height: 9, z: 8, rotate: 0 })
+    );
+    // Waist line: belt on the junction
+    put(belts[0], { left: spineX - 8, top: junctionY - 5, width: 16, height: 10, z: 8, rotate: -6 });
+    // Bottom of spine + under the primary hem: shoes in dressing order
+    put(shoes[0], { left: axis - 13, top: hemY - 3, width: 26, height: 15, z: 7, rotate: 0, align: "top" });
+    put(shoes[1], { left: spineX - 12, top: Math.min(hemY + 1, 84), width: 24, height: 14, z: 7, rotate: 0, align: "top" });
+    put(shoes[2], { left: 3, top: 82, width: 24, height: 13, z: 7, rotate: 0, align: "top", alignX: "left" });
+    // Bag at the hip on the column's freer side
+    const bagOnLeft = axis > 50;
+    put(bags[0], {
+      left: bagOnLeft
+        ? Math.max(1, (botRect?.left ?? axis - 15) - 16)
+        : Math.min(81, (botRect ? botRect.left + botRect.width : axis + 12) - 2),
+      top: junctionY + 4, width: 18, height: 18, z: 7, rotate: 0,
+    });
+    put(bags[1], {
+      left: bagOnLeft ? 80 : 2,
+      top: junctionY + 10, width: 16, height: 16, z: 7, rotate: 0,
+      alignX: bagOnLeft ? "right" : "left",
+    });
+    put(others[0], { left: 82, top: 64, width: 14, height: 12, z: 6, rotate: 3, alignX: "right" });
+    put(others[1], { left: 2, top: 64, width: 13, height: 11, z: 6, rotate: -4, alignX: "left" });
+
+    return autoscale(placed);
   }
-  put(others[0], { left: 80, top: 66, width: 14, height: 12, z: 5, rotate: 3, alignX: "right" });
-  put(others[1], { left: 2, top: 66, width: 13, height: 11, z: 5, rotate: -4, alignX: "left" });
-
-  return autoscale(placed);
 }
 
 // Canvas is 4:5 — percent units are not square, so aspect math must
