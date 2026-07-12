@@ -167,6 +167,21 @@ async function runLookbookGeneration({
     // ribbon, hosiery) must at minimum never be filled by one of these
     const GARMENT_TEXT =
       /\bshirts?\b|\btops?\b|\btees?\b|polo|dress|trouser|\bpants?\b|skirt|\bshorts?\b|sweater|\bknits?\b|cardigan|jacket|\bcoats?\b|blazer|jeans?|\btanks?\b|blouse|tunic|hoodie|romper|jumpsuit/i;
+    // Garment silhouette families: a skirt piece must be filled by a skirt,
+    // never a "silk pj top" that shares its keywords
+    const GARMENT_TYPES: Array<[RegExp, RegExp]> = [
+      [/skirt/i, /skirt/i],
+      [/trouser|\bpants?\b|jeans?|denim|chino/i, /trouser|\bpants?\b|jeans?|chino/i],
+      [/\bshorts?\b/i, /\bshorts?\b/i],
+      [/dress|gown/i, /dress|gown/i],
+      [/blazer|jacket|\bcoats?\b|trench|cardigan|overshirt/i, /blazer|jacket|\bcoats?\b|trench|cardigan|overshirt/i],
+      [/\btops?\b|\btees?\b|shirt|blouse|knit|sweater|polo|tank|tunic|halter|cami|bodysuit/i,
+        /\btops?\b|\btees?\b|shirt|blouse|knit|sweater|polo|tank|tunic|cami|halter|bodysuit|henley/i],
+    ];
+    const garmentTypeOk = (piece: { role: string; description: string }, text: string) => {
+      const fams = GARMENT_TYPES.filter(([role]) => role.test(`${piece.role} ${piece.description}`));
+      return fams.length === 0 || fams.some(([, ok]) => ok.test(text));
+    };
 
     const pool: typeof all = [];
     const lines: string[] = [];
@@ -246,8 +261,8 @@ async function runLookbookGeneration({
           console.log(`[lookbook ${lookbookId}] type reject: ${product.title} as ${piece.role}`);
           continue;
         }
-      } else if (!GARMENT_TEXT.test(text)) {
-        // A garment piece must be filled by something that reads as a garment
+      } else if (!GARMENT_TEXT.test(text) || !garmentTypeOk(piece, text)) {
+        // A garment piece must be filled by a garment OF ITS SILHOUETTE
         console.log(`[lookbook ${lookbookId}] type reject: ${product.title} as ${piece.role}`);
         continue;
       }
@@ -305,8 +320,13 @@ async function runLookbookGeneration({
     chosen.forEach((c, ci) => {
       if (verdicts.get(ci) !== false) return;
       const seen = seenPerOutfit.get(c.outfit) ?? new Set<string>();
+      const piece = flatPieces[c.pieceIdx];
       const alt = (poolByPiece.get(c.pieceIdx) ?? []).find(
-        (p) => p.url !== c.product.url && !seen.has(p.url) && !claimedAlts.has(p.url)
+        (p) =>
+          p.url !== c.product.url &&
+          !seen.has(p.url) &&
+          !claimedAlts.has(p.url) &&
+          (!garmentPieceIdx.has(c.pieceIdx) || garmentTypeOk(piece, productText(p)))
       );
       if (alt) {
         claimedAlts.add(alt.url);
