@@ -142,6 +142,21 @@ type Template = {
 
 const TEMPLATES: Template[] = [
   {
+    // Two dressed columns flanking a solo center top (traced from the
+    // H&S olive/tan board): camp shirt TL over shorts, tank center,
+    // second shirt TR over trousers. Accessories anchor anatomically.
+    id: "trio",
+    needs: { head: 3, bottom: 2 },
+    pairs: [[0, 1], [2, 3]],
+    slots: [
+      { kind: "head", left: 2, top: 2, width: 30, height: 32, z: 4, rotate: 0, align: "bottom" },
+      { kind: "bottom", left: 3, top: 36, width: 29, height: 28, z: 2, rotate: 0, align: "top" },
+      { kind: "head", left: 66, top: 2, width: 32, height: 34, z: 4, rotate: 0, align: "bottom" },
+      { kind: "bottom", left: 66, top: 38, width: 32, height: 54, z: 2, rotate: 0, align: "top" },
+      { kind: "head", left: 37, top: 4, width: 24, height: 30, z: 3, rotate: 0, align: "bottom" },
+    ],
+  },
+  {
     // Women's 3-column capsule + dress (traced from Stefana chocolate board)
     id: "capsule3",
     needs: { head: 3, bottom: 2 },
@@ -311,12 +326,16 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
         if (filled) garmentFilled++;
       }
     }
+    void score;
     // A grid with empty garment zones reads as holes — the adaptive packer
     // composes missing-piece looks better than a gappy template
     if (garmentSlots > 0 && garmentFilled / garmentSlots < 0.7) continue;
-    if (score > bestScore) {
+    // Garments decide the grid (accessories anchor anatomically anyway);
+    // ties go to the template with the fewest unfilled garment zones
+    const gScore = garmentFilled + garmentFilled / Math.max(1, garmentSlots);
+    if (gScore > bestScore) {
       template = t;
-      bestScore = score;
+      bestScore = gScore;
     }
   }
 
