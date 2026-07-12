@@ -89,14 +89,23 @@ export function groupIntoLooks(items: LookItem[]): LookItem[][] {
 // wins when present — product titles like "The Legend in Tokyo Tortoise"
 // say nothing about being sunglasses.
 export function accKind(
-  i: Pick<LookItem, "name" | "kind">
+  i: Pick<LookItem, "name" | "kind"> & { note?: string }
 ): "bag" | "belt" | "sunglasses" | "jewelry" | "other" {
-  const text = `${i.kind ?? ""} ${i.name}`;
-  if (/bag|tote|clutch|crossbody|crescent|satchel|hobo/i.test(text)) return "bag";
-  if (/belt/i.test(text)) return "belt";
-  if (/sunglass|eyewear|frames/i.test(text)) return "sunglasses";
-  if (/earring|necklace|ring|bracelet|hoop|pendant|choker|chain|watch|cuff|jewel/i.test(text)) return "jewelry";
-  return "other";
+  const classify = (text: string) => {
+    if (/bag|tote|clutch|crossbody|crescent|satchel|hobo/i.test(text)) return "bag" as const;
+    if (/belt/i.test(text)) return "belt" as const;
+    if (/sunglass|eyewear|frames|acetate/i.test(text)) return "sunglasses" as const;
+    if (/earring|necklace|ring|bracelet|hoop|pendant|choker|chain|watch|cuff|jewel/i.test(text)) return "jewelry" as const;
+    return "other" as const;
+  };
+  // Three tiers: designed role (exact), then product title, then the
+  // stylist note as a last resort — titles like "The Legend in Tokyo
+  // Tortoise" say nothing, but the note calls it sunglasses
+  const byKind = i.kind ? classify(i.kind) : "other";
+  if (byKind !== "other") return byKind;
+  const byName = classify(i.name);
+  if (byName !== "other") return byName;
+  return i.note ? classify(i.note) : "other";
 }
 
 /** Only transparent cutouts belong on the collage canvas */
@@ -186,10 +195,10 @@ const TEMPLATES: Template[] = [
     needs: { head: 2, bottom: 1, shoes: 1 },
     pairs: [[1, 2]],
     slots: [
-      { kind: "head", left: 6, top: 2, width: 38, height: 33, z: 3, rotate: 0, align: "bottom" },
-      { kind: "head", left: 56, top: 2, width: 38, height: 33, z: 3, rotate: 0, align: "bottom" },
-      { kind: "bottom", left: 58, top: 37, width: 36, height: 54, z: 2, rotate: 0, align: "top" },
-      { kind: "bottom", left: 5, top: 56, width: 30, height: 37, z: 2, rotate: 0, align: "top" },
+      { kind: "head", left: 2, top: 2, width: 44, height: 36, z: 3, rotate: 0, align: "bottom" },
+      { kind: "head", left: 54, top: 2, width: 44, height: 36, z: 3, rotate: 0, align: "bottom" },
+      { kind: "bottom", left: 56, top: 40, width: 42, height: 53, z: 2, rotate: 0, align: "top" },
+      { kind: "bottom", left: 2, top: 58, width: 34, height: 36, z: 2, rotate: 0, align: "top" },
       { kind: "jewelry", left: 45, top: 7, width: 10, height: 13, z: 6, rotate: 0 },
       { kind: "shoes", left: 8, top: 38, width: 27, height: 15, z: 5, rotate: 0, align: "bottom" },
       { kind: "belt", left: 39, top: 43, width: 17, height: 11, z: 6, rotate: -6 },
@@ -231,10 +240,13 @@ const TEMPLATES: Template[] = [
 export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Slot }> {
   const withImage = items.filter((i) => i.image_url && isCutout(i.image_url));
 
+  const GARMENT_CATS = ["outerwear", "dresses", "tops", "bottoms"];
   // Miscategorized trinkets must never claim a garment column — a
-  // mislabeled "top" earring in a 40%-wide column reads absurd.
+  // mislabeled "top" earring in a 40%-wide column reads absurd. NO note
+  // tier here: a shirt whose styling note mentions "rolled cuffs" is
+  // still a shirt.
   const isSmallAcc = (i: LookItem) =>
-    ["jewelry", "sunglasses", "belt"].includes(accKind(i));
+    ["jewelry", "sunglasses", "belt"].includes(accKind({ name: i.name, kind: i.kind }));
   const dresses = withImage
     .filter((i) => i.category === "dresses" && !isSmallAcc(i))
     .slice(0, 2);
@@ -249,14 +261,16 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     (i) =>
       !dresses.includes(i) && !heads.includes(i) && !bottoms.includes(i) && !shoes.includes(i)
   );
-  const bags = rest.filter((i) => accKind(i) === "bag").slice(0, 2);
-  const belts = rest.filter((i) => accKind(i) === "belt").slice(0, 1);
-  const sunnies = rest.filter((i) => accKind(i) === "sunglasses").slice(0, 1);
-  const jewelry = rest.filter((i) => accKind(i) === "jewelry").slice(0, 3);
+  // Note-tier classification only for non-garments: leftover garments in
+  // rest must never become trinkets because their note mentions a belt
+  const trinketable = (i: LookItem) => !GARMENT_CATS.includes(i.category);
+  const bags = rest.filter((i) => trinketable(i) && accKind(i) === "bag").slice(0, 2);
+  const belts = rest.filter((i) => trinketable(i) && accKind(i) === "belt").slice(0, 1);
+  const sunnies = rest.filter((i) => trinketable(i) && accKind(i) === "sunglasses").slice(0, 1);
+  const jewelry = rest.filter((i) => trinketable(i) && accKind(i) === "jewelry").slice(0, 3);
   // Overflow garments don't belong in the rotated corner trinket slots —
   // and neither do surplus trinkets (a second belt at a canvas edge reads
   // as a mistake; it lives in the thumbnail strip instead)
-  const GARMENT_CATS = ["outerwear", "dresses", "tops", "bottoms"];
   const others = rest
     .filter(
       (i) =>
@@ -350,8 +364,8 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   const columns = cols.slice(0, 4);
   const n = columns.length;
 
-  const COL_W = n <= 1 ? 44 : n === 2 ? 40 : n === 3 ? 29 : 22;
-  const GAP = n <= 2 ? 6 : 3;
+  const COL_W = n <= 1 ? 46 : n === 2 ? 44 : n === 3 ? 30 : 23;
+  const GAP = n <= 2 ? 4 : 3;
   const startX = 50 - (n * COL_W + (n - 1) * GAP) / 2;
 
   columns.forEach((col, i) => {
@@ -455,8 +469,21 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     );
     // Waist line: belt on the junction
     put(belts[0], { left: spineX - 8, top: junctionY - 5, width: 16, height: 10, z: 8, rotate: -6 });
-    // Bottom of spine + under the primary hem: shoes in dressing order
-    put(shoes[0], { left: axis - 13, top: hemY - 3, width: 26, height: 15, z: 7, rotate: 0, align: "top" });
+    // Bottom of spine + under the primary hem: shoes in dressing order.
+    // A legless primary column (its trousers live under another top) gets
+    // its shoes right under the shirt hem, reference-style, not sunk to
+    // the canvas floor.
+    const bottomUnderPrimary =
+      !topRect ||
+      bottoms.some((b) => {
+        const r = rectOf(b);
+        return r && r.left < topRect.left + topRect.width && r.left + r.width > topRect.left;
+      });
+    put(shoes[0], {
+      left: axis - 13,
+      top: bottomUnderPrimary ? hemY - 3 : (topRect ? topRect.top + topRect.height + 3 : hemY - 3),
+      width: 26, height: 15, z: 7, rotate: 0, align: "top",
+    });
     put(shoes[1], { left: spineX - 12, top: Math.min(hemY + 1, 84), width: 24, height: 14, z: 7, rotate: 0, align: "top" });
     put(shoes[2], { left: 3, top: 82, width: 24, height: 13, z: 7, rotate: 0, align: "top", alignX: "left" });
     // Bag at the hip on the column's freer side
@@ -530,7 +557,7 @@ function autoscale(
   const maxR = Math.max(...placed.map(({ slot }) => slot.left + slot.width));
   const minT = Math.min(...placed.map(({ slot }) => slot.top));
   const maxB = Math.max(...placed.map(({ slot }) => slot.top + slot.height));
-  const s = Math.min(1.3, 92 / Math.max(1, maxR - minL), 92 / Math.max(1, maxB - minT));
+  const s = Math.min(1.35, 95 / Math.max(1, maxR - minL), 95 / Math.max(1, maxB - minT));
   if (s > 1.02) {
     const cx = (minL + maxR) / 2;
     const cy = (minT + maxB) / 2;
