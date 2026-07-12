@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { hexToHsl } from "@/lib/color";
-import { planDiscovery, curateLookbook, pickBestImage, locateGarment } from "@/lib/ai";
+import { planDiscovery, designOutfit, matchPiecesToProducts, pickBestImage, locateGarment } from "@/lib/ai";
 import { processProductImage } from "@/lib/images";
 import { SOURCES, sourceById } from "@/lib/sources";
 import { fetchStoreProducts, filterByKeywords } from "@/lib/shopify";
@@ -31,44 +31,71 @@ export async function generateLookbookWithAi(formData: FormData) {
     clientName = data?.name ?? null;
   }
 
-  // Source REAL products via the Discover pipeline, then curate
-  let curated;
-  let candidates;
+  // Celebrity-stylist pipeline: DESIGN the complete look first (trend-informed,
+  // head-to-toe incl. accessories), then source each designed piece.
+  let spec;
+  let chosen: Array<{
+    product: NonNullable<Awaited<ReturnType<typeof fetchStoreProducts>>>[number];
+    category: string;
+    color_hex: string;
+    note: string;
+  }> = [];
   try {
+    spec = await designOutfit(brief, clientName);
+
     const storeCatalog = SOURCES.map((s) => `${s.id}: ${s.name} — ${s.vibe}`).join("\n");
-    const plan = await planDiscovery(brief, storeCatalog);
+    const pieceSummary = spec.pieces
+      .map((p, i) => `${i}. [${p.role}] ${p.description}`)
+      .join("\n");
+    const plan = await planDiscovery(`${brief}. Pieces to source:\n${pieceSummary}`, storeCatalog);
     const stores = plan.store_ids
       .map(sourceById)
       .filter((s): s is NonNullable<typeof s> => Boolean(s))
       .slice(0, 6);
     const catalogs = await Promise.all(stores.map((s) => fetchStoreProducts(s)));
-    candidates = filterByKeywords(catalogs.flat(), plan.keywords).slice(0, 120);
-    if (candidates.length < count) {
+    const all = catalogs.flat();
+
+    // Per-piece candidate pools, flattened with global indexes
+    const pool: typeof all = [];
+    const lines: string[] = [];
+    spec.pieces.forEach((piece, pi) => {
+      const matchesForPiece = filterByKeywords(all, piece.keywords).slice(0, 12);
+      for (const prod of matchesForPiece) {
+        lines.push(
+          `${pool.length}. [piece ${pi}: ${piece.role}] ${prod.title} | ${prod.productType} | ${prod.storeName} | $${prod.price ?? "?"} | tags: ${prod.tags.slice(0, 4).join(", ")}`
+        );
+        pool.push(prod);
+      }
+    });
+    if (pool.length === 0) {
       redirect(
-        `/lookbooks?error=${encodeURIComponent("Not enough matching products in the stores — try broader wording")}`
+        `/lookbooks?error=${encodeURIComponent("No store matches for this design — try broader wording")}`
       );
     }
-    const lines = candidates
-      .map(
-        (p, i) =>
-          `${i}. ${p.title} | ${p.productType} | ${p.storeName} | $${p.price ?? "?"} | tags: ${p.tags.slice(0, 5).join(", ")}`
-      )
-      .join("\n");
-    curated = await curateLookbook(brief, clientName, lines, count);
+
+    const { matches } = await matchPiecesToProducts(pieceSummary, lines.join("\n"));
+    const seenUrls = new Set<string>();
+    for (const m of matches) {
+      const product = pool[m.index];
+      const piece = spec.pieces[m.piece];
+      if (!product || !piece || seenUrls.has(product.url)) continue;
+      seenUrls.add(product.url);
+      chosen.push({ product, category: piece.category, color_hex: piece.color_hex, note: m.note });
+    }
+    chosen = chosen.slice(0, Math.max(count, spec.pieces.length));
+    if (chosen.length === 0) {
+      redirect(`/lookbooks?error=${encodeURIComponent("Couldn't match the design to store inventory")}`);
+    }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "AI curation failed";
+    const message = err instanceof Error ? err.message : "AI styling failed";
     redirect(`/lookbooks?error=${encodeURIComponent(message)}`);
   }
-
-  const chosen = curated.picks
-    .filter((pick) => candidates[pick.index])
-    .slice(0, count);
 
   // Photos: flats cut out directly; on-model shots get a headless garment
   // crop first so every piece lands on the collage
   const prepared = await Promise.all(
     chosen.map(async (pick) => {
-      const product = candidates![pick.index];
+      const { product } = pick;
       const pool = product.images.length > 0 ? product.images : [product.image];
       const best = await pickBestImage(pool);
       const chosenUrl = pool[best.index] ?? product.image;
@@ -108,8 +135,8 @@ export async function generateLookbookWithAi(formData: FormData) {
     .from("lookbooks")
     .insert({
       stylist_id: user.id,
-      title: curated.title,
-      description: curated.description,
+      title: spec.title,
+      description: spec.description,
       client_id: clientId || null,
     })
     .select("id")

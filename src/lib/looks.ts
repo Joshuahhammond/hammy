@@ -48,7 +48,7 @@ export function groupIntoLooks(items: LookItem[]): LookItem[][] {
     look.push(...take(pools, "tops", 3 - look.length));
     look.push(...take(pools, "bottoms", 2));
     look.push(...take(pools, "shoes", 2));
-    look.push(...take(pools, "accessories", 2));
+    look.push(...take(pools, "accessories", 3));
     look.push(...take(pools, "other", 1));
     if (look.length === 0) break;
     looks.push(look);

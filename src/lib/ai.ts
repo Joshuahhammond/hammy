@@ -9,6 +9,127 @@ const MODEL = "claude-opus-4-8";
 // Resolves ANTHROPIC_API_KEY from the environment
 const client = new Anthropic();
 
+const CELEB_STYLIST_SYSTEM =
+  "You are a world-class celebrity stylist and clothing designer — the person Kim Kardashian's team " +
+  "calls before a press week. You design complete, intentional looks: every outfit is head-to-toe " +
+  "(outerwear when it belongs, top, bottom, shoes) and finished with deliberate accessories — belt, " +
+  "sunglasses, bag, jewelry. You think in silhouettes, proportions, and a tight color story. " +
+  "You know current runway and street-style trends and reference them.";
+
+const OutfitSpecSchema = z.object({
+  title: z.string().describe("Evocative lookbook title, 2-6 words"),
+  description: z
+    .string()
+    .describe("One or two sentences introducing the collection to the client, in the stylist's voice"),
+  pieces: z
+    .array(
+      z.object({
+        role: z
+          .string()
+          .describe("The piece's role in the look: 'top', 'second top', 'trouser', 'shoes', 'belt', 'sunglasses', 'bag', 'outerwear', ..."),
+        category: z.enum(CATEGORIES),
+        description: z
+          .string()
+          .describe("Precise designer spec: silhouette, fabric, color, details — e.g. 'oversized chocolate suede belted blazer, strong shoulder'"),
+        color_hex: z.string().describe("The piece's intended color as 6-digit hex"),
+        keywords: z
+          .array(z.string())
+          .describe("3-5 lowercase single-word search stems for finding this piece in store catalogs (e.g. 'blazer', 'suede', 'chocolate')"),
+      })
+    )
+    .describe(
+      "7-10 pieces forming a COMPLETE look: at least one top, one bottom, one pair of shoes, and 2-3 finishing accessories (belt, sunglasses, bag). Outerwear when the brief calls for it."
+    ),
+});
+
+export type OutfitSpec = z.infer<typeof OutfitSpecSchema>;
+
+/**
+ * Design phase: a trend-informed, head-to-toe outfit plan. Searches the web
+ * for current editorial/street-style inspiration first, then specs each piece.
+ */
+export async function designOutfit(
+  brief: string,
+  clientName: string | null
+): Promise<OutfitSpec> {
+  const forClient = clientName ? ` The client's name is ${clientName}.` : "";
+  let prose = "";
+  try {
+    const design = await client.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      system: CELEB_STYLIST_SYSTEM,
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
+      messages: [
+        {
+          role: "user",
+          content: `Design a complete lookbook for this brief: "${brief}".${forClient}\n\nFirst, search the web briefly for what's trending right now in this aesthetic (street style, Pinterest-type editorial, runway) and let it inform the design. Then write the design: a short vision, and a numbered piece list (7-10 pieces) covering the FULL look — top(s), bottom(s), shoes, and 2-3 finishing accessories like a belt, sunglasses, or a bag; outerwear if it belongs. For each piece give silhouette, fabric, exact color, and the search words a buyer would use.`,
+        },
+      ],
+    });
+    prose = design.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+  } catch {
+    prose = ""; // search unavailable — design from knowledge below
+  }
+
+  const response = await client.messages.parse({
+    model: MODEL,
+    max_tokens: 16000,
+    system: CELEB_STYLIST_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: prose
+          ? `Structure this outfit design into the schema, keeping every piece:\n\n${prose}`
+          : `Design a complete lookbook for this brief: "${brief}".${forClient} Cover the FULL look — top(s), bottom(s), shoes, and 2-3 finishing accessories (belt, sunglasses, bag); outerwear if it belongs.`,
+      },
+    ],
+    output_config: { format: zodOutputFormat(OutfitSpecSchema) },
+  });
+  if (!response.parsed_output) throw new Error("Could not design the look");
+  return response.parsed_output;
+}
+
+const PieceMatchSchema = z.object({
+  matches: z
+    .array(
+      z.object({
+        piece: z.number().describe("The piece number from the design spec"),
+        index: z.number().describe("The chosen candidate's global number"),
+        note: z
+          .string()
+          .describe("A warm styling note to the client: how this piece works in the look"),
+      })
+    )
+    .describe("Exactly one match per design piece that has any suitable candidate. Skip pieces with no good candidate."),
+});
+
+export type PieceMatches = z.infer<typeof PieceMatchSchema>;
+
+/** Match each designed piece to the best real product from its candidates. */
+export async function matchPiecesToProducts(
+  specSummary: string,
+  candidateLines: string
+): Promise<PieceMatches> {
+  const response = await client.messages.parse({
+    model: MODEL,
+    max_tokens: 16000,
+    system: CELEB_STYLIST_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `You designed this look:\n${specSummary}\n\nReal, in-stock candidates (each tagged with the piece it could fill):\n${candidateLines}\n\nFor each design piece, choose the single candidate that best honors the design — silhouette and color fidelity over price. Never choose two candidates that are near-duplicates. HARD RULE: the candidate must actually BE that kind of piece — a polo shirt can never fill a shoes slot. If no candidate genuinely is the designed piece, OMIT that piece entirely rather than substituting a different garment type.`,
+      },
+    ],
+    output_config: { format: zodOutputFormat(PieceMatchSchema) },
+  });
+  if (!response.parsed_output) throw new Error("Could not match pieces to products");
+  return response.parsed_output;
+}
+
 const CuratedLookbookSchema = z.object({
   title: z.string().describe("Evocative lookbook title, 2-6 words"),
   description: z
