@@ -131,12 +131,15 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   const belts = rest.filter((i) => accKind(i.name) === "belt").slice(0, 1);
   const sunnies = rest.filter((i) => accKind(i.name) === "sunglasses").slice(0, 1);
   const jewelry = rest.filter((i) => accKind(i.name) === "jewelry").slice(0, 3);
-  // Overflow garments don't belong in the rotated corner trinket slots
+  // Overflow garments don't belong in the rotated corner trinket slots —
+  // and neither do surplus trinkets (a second belt at a canvas edge reads
+  // as a mistake; it lives in the thumbnail strip instead)
   const GARMENT_CATS = ["outerwear", "dresses", "tops", "bottoms"];
   const others = rest
     .filter(
       (i) =>
         !GARMENT_CATS.includes(i.category) &&
+        !isSmallAcc(i) &&
         ![...bags, ...belts, ...sunnies, ...jewelry].includes(i)
     )
     .slice(0, 2);
@@ -194,20 +197,25 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   // ---- Satellites: bags overlay column edges (reference style) ---------
   put(bags[0], { left: 76, top: 52, width: 20, height: 20, z: 5, rotate: 0, alignX: "right" });
   put(bags[1], { left: 2, top: 52, width: 18, height: 18, z: 5, rotate: 0, alignX: "left" });
-  put(belts[0], { left: 58, top: 30, width: 16, height: 10, z: 6, rotate: -8 });
+  // Belt reads right at a waistline, not on a shirt chest: center gap at
+  // waist height on multi-column boards, beside the column waist on single
+  put(belts[0], n >= 2
+    ? { left: 41, top: 52, width: 16, height: 11, z: 6, rotate: -8 }
+    : { left: 58, top: 30, width: 16, height: 10, z: 6, rotate: -8 });
 
   // Trinkets live in the gaps between column tops when there are columns
-  // to gap; on single-column boards they stack the left rail.
+  // to gap; on single-column boards they stack the left rail. Necklace and
+  // chain shots are mostly empty space, so jewelry boxes stay ≥10% wide.
   if (n >= 2) {
     put(sunnies[0], { left: 22, top: 0, width: 14, height: 8, z: 6, rotate: -5 });
-    put(jewelry[0], { left: 56, top: 1, width: 8, height: 8, z: 6, rotate: 0 });
-    put(jewelry[1], { left: 2, top: 40, width: 8, height: 8, z: 6, rotate: 4, alignX: "left" });
-    put(jewelry[2], { left: 90, top: 36, width: 8, height: 8, z: 6, rotate: -3, alignX: "right" });
+    put(jewelry[0], { left: 54, top: 0, width: 12, height: 11, z: 6, rotate: 0 });
+    put(jewelry[1], { left: 2, top: 38, width: 11, height: 10, z: 6, rotate: 4, alignX: "left" });
+    put(jewelry[2], { left: 86, top: 33, width: 11, height: 10, z: 6, rotate: -3, alignX: "right" });
   } else {
     put(sunnies[0], { left: 4, top: 2, width: 16, height: 9, z: 6, rotate: -5, alignX: "left" });
-    put(jewelry[0], { left: 4, top: 14, width: 8, height: 8, z: 6, rotate: 0, alignX: "left" });
-    put(jewelry[1], { left: 5, top: 26, width: 7, height: 7, z: 6, rotate: 4, alignX: "left" });
-    put(jewelry[2], { left: 90, top: 36, width: 8, height: 8, z: 6, rotate: -3, alignX: "right" });
+    put(jewelry[0], { left: 4, top: 14, width: 12, height: 11, z: 6, rotate: 0, alignX: "left" });
+    put(jewelry[1], { left: 4, top: 28, width: 10, height: 9, z: 6, rotate: 4, alignX: "left" });
+    put(jewelry[2], { left: 86, top: 33, width: 11, height: 10, z: 6, rotate: -3, alignX: "right" });
   }
   put(others[0], { left: 80, top: 66, width: 14, height: 12, z: 5, rotate: 3, alignX: "right" });
   put(others[1], { left: 2, top: 66, width: 13, height: 11, z: 5, rotate: -4, alignX: "left" });
