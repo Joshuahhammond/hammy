@@ -64,37 +64,35 @@ export default async function AppLayout({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile top bar */}
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-bone bg-white px-4 py-3 md:hidden">
-          <Link href="/dashboard" className="text-lg font-bold tracking-tight text-ink">
-            hammy
-          </Link>
-          <form action={signOut}>
-            <button type="submit" className="text-xs font-medium text-ink/60">
-              Sign out
-            </button>
-          </form>
+        {/* Mobile header: brand row + always-visible nav strip */}
+        <header className="sticky top-0 z-20 border-b border-bone bg-white md:hidden">
+          <div className="flex items-center justify-between px-4 pb-1 pt-3">
+            <Link href="/dashboard" className="text-lg font-bold tracking-tight text-ink">
+              hammy
+            </Link>
+            <form action={signOut}>
+              <button type="submit" className="text-xs font-medium text-ink/60">
+                Sign out
+              </button>
+            </form>
+          </div>
+          <nav className="flex gap-1 overflow-x-auto px-2 pb-2">
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-ink/70 active:bg-cream"
+              >
+                {item.short}
+              </Link>
+            ))}
+          </nav>
         </header>
 
-        <main className="flex-1 overflow-x-hidden px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">
+        <main className="flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8">
           {children}
         </main>
       </div>
-
-      {/* Mobile bottom tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-bone bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="grid grid-cols-5">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="py-3 text-center text-[11px] font-medium uppercase tracking-wide text-ink/70 active:bg-cream"
-            >
-              {item.short}
-            </Link>
-          ))}
-        </div>
-      </nav>
     </div>
   );
 }
