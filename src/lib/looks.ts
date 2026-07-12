@@ -423,6 +423,46 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   function anchorAndScale(): Array<{ item: LookItem; slot: Slot }> {
     truthBoxes(placed); // garment rects become anchor truth (idempotent)
 
+    // Normalize garment visual weight: reference boards read as a grid of
+    // same-scale products, but retailer photos fill their frames
+    // differently, so slot math alone lets one tall cutout dominate.
+    const BANDS: Record<string, [number, number]> = {
+      head: [20, 26], bottom: [36, 52], dress: [52, 72],
+    };
+    for (const p of placed) {
+      const kind = heads.includes(p.item) ? "head"
+        : bottoms.includes(p.item) ? "bottom"
+        : dresses.includes(p.item) ? "dress" : null;
+      if (!kind || !p.item.aspect) continue;
+      const [lo, hi] = BANDS[kind];
+      let target = Math.min(hi, Math.max(lo, p.slot.height));
+      // Wide pieces (shorts) hit their width cap before their height
+      // floor — never let banding blow an item past its column width
+      const MAX_W: Record<string, number> = { head: 32, bottom: 36, dress: 34 };
+      const wouldW = p.slot.width * (target / p.slot.height);
+      if (wouldW > MAX_W[kind]) {
+        target = p.slot.height * (MAX_W[kind] / p.slot.width);
+      }
+      if (Math.abs(target - p.slot.height) < 0.5) continue;
+      const f = target / p.slot.height;
+      const cx = p.slot.left + p.slot.width / 2;
+      p.slot.width *= f;
+      p.slot.left = cx - p.slot.width / 2;
+      p.slot.height = target; // top edge (collar / waistband) stays put
+    }
+    // Row lock: each bottom snaps its waistband to the hem of the top
+    // sharing its column, closing vertical drift into an even gutter
+    for (const b of bottoms) {
+      const br = placed.find((p) => p.item === b)?.slot;
+      if (!br) continue;
+      const h = heads
+        .map((hd) => placed.find((p) => p.item === hd)?.slot)
+        .find((hr) => hr && hr.left < br.left + br.width && hr.left + hr.width > br.left);
+      if (!h) continue;
+      const want = h.top + h.height + 1.5;
+      if (Math.abs(want - br.top) < 15) br.top = want;
+    }
+
     const rectOf = (it?: LookItem) =>
       it ? placed.find((p) => p.item === it)?.slot : undefined;
     const dress0 = dresses[0];
