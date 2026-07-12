@@ -160,7 +160,7 @@ export async function rankDiscovered(
     messages: [
       {
         role: "user",
-        content: `Brief: "${brief}"\n\nCandidate products (real, in stock):\n${candidateLines}\n\nPick up to 20 that genuinely fit the brief — cohesive as a set, varied across categories, no near-duplicates.`,
+        content: `Brief: "${brief}"\n\nCandidate products (real, in stock):\n${candidateLines}\n\nPick up to 20 that genuinely fit the brief — cohesive as a set, varied across categories, no near-duplicates. Spread picks across at least three stores when quality allows, so the client sees range.`,
       },
     ],
     output_config: { format: zodOutputFormat(DiscoveryPicksSchema) },

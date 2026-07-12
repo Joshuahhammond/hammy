@@ -101,6 +101,11 @@ export const SOURCES: Source[] = [
   { id: "splendid", name: "Splendid", domain: "splendid.com", vibe: "buttery-soft everyday knits and lounge; mid-range" },
   { id: "krushkandy", name: "Krush Kandy", domain: "krushkandy.com", vibe: "cozy boutique hoodie-and-short sets, warm tones; affordable" },
   { id: "jluxlabel", name: "JLUXLABEL", domain: "jluxlabel.com", vibe: "chic comfort sets, knit co-ords and resort glam; mid-range" },
+  { id: "lakepajamas", name: "LAKE Pajamas", domain: "lakepajamas.com", vibe: "classic piped pima-cotton pajama sets, heirloom-preppy; premium" },
+  { id: "printfresh", name: "Printfresh", domain: "printfresh.com", vibe: "hand-illustrated printed pajama sets, joyful patterns; mid-premium" },
+  { id: "cozyearth", name: "Cozy Earth", domain: "cozyearth.com", vibe: "bamboo-soft pajamas and loungewear, temperature-regulating; premium" },
+  { id: "pjsalvage", name: "P.J. Salvage", domain: "pjsalvage.com", vibe: "cozy thermal and flannel pajama sets, playful prints; mid-range" },
+  { id: "papinelle", name: "Papinelle", domain: "papinelle.com", vibe: "feminine Australian sleepwear, soft florals and washable silk; mid-premium" },
 ];
 
 export const sourceById = (id: string) => SOURCES.find((s) => s.id === id);
