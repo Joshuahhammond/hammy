@@ -366,17 +366,35 @@ async function runLookbookGeneration({
       return false;
     });
 
-    if (kept.length === 0) throw new Error("Couldn't match the design to store inventory");
-    kept.sort((a, b) => a.outfit - b.outfit);
+    // Final type gate — the LAST line of defense before anything is saved.
+    // Re-derives type fitness for every survivor regardless of which path
+    // produced it (match, auto-fill, palette swap): an accessory piece
+    // holding a garment product, or vice versa, dies here.
+    const typed = kept.filter((c) => {
+      const piece = flatPieces[c.pieceIdx];
+      const text = productText(c.product);
+      let ok: boolean;
+      if (garmentPieceIdx.has(c.pieceIdx)) {
+        ok = GARMENT_TEXT.test(text) && garmentTypeOk(piece, text);
+      } else {
+        const guards = guardsByPiece.get(c.pieceIdx) ?? [];
+        ok = guards.length > 0 ? guards.some((g) => g.test(text)) : !GARMENT_TEXT.test(text);
+      }
+      if (!ok)
+        console.log(`[lookbook ${lookbookId}] final type drop: ${c.product.title} as ${piece?.role}`);
+      return ok;
+    });
+    if (typed.length === 0) throw new Error("Couldn't match the design to store inventory");
+    typed.sort((a, b) => a.outfit - b.outfit);
     console.log(
-      `[lookbook ${lookbookId}] matched ${kept.length}/${flatPieces.length} designed pieces (${matches.length} raw matches, ${chosen.length - kept.length} palette drops)`
+      `[lookbook ${lookbookId}] matched ${typed.length}/${flatPieces.length} designed pieces (${matches.length} raw matches, ${chosen.length - kept.length} palette drops)`
     );
 
     // 4. Photos in small batches (bg removal is CPU-heavy)
-    const prepared: Array<{ pick: (typeof kept)[number]; imageUrl: string }> = [];
-    for (let i = 0; i < kept.length; i += 4) {
+    const prepared: Array<{ pick: (typeof typed)[number]; imageUrl: string }> = [];
+    for (let i = 0; i < typed.length; i += 4) {
       const batch = await Promise.all(
-        kept.slice(i, i + 4).map(async (pick) => {
+        typed.slice(i, i + 4).map(async (pick) => {
           const { product } = pick;
           const imgs = product.images.length > 0 ? product.images : [product.image];
           const best = await pickBestImage(imgs);
