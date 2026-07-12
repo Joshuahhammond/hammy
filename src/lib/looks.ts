@@ -544,7 +544,12 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
       width: 26, height: 15, z: 7, rotate: 0, align: "top",
     });
     put(shoes[1], { left: spineX - 12, top: Math.min(hemY + 1, 84), width: 24, height: 14, z: 7, rotate: 0, align: "top" });
-    put(shoes[2], { left: 3, top: 82, width: 24, height: 13, z: 7, rotate: 0, align: "top", alignX: "left" });
+    // Third pair joins the footwear cluster below the first, like the
+    // reference's center-bottom shoe cell — never stranded in a corner
+    put(shoes[2], {
+      left: axis - 22, top: Math.min(hemY + 12, 80),
+      width: 26, height: 15, z: 7, rotate: 0, align: "top",
+    });
     // Bag at the hip on the column's freer side
     const bagOnLeft = axis > 50;
     put(bags[0], {
