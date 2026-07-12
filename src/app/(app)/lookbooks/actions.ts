@@ -173,9 +173,17 @@ async function runLookbookGeneration({
       // Guard every non-garment piece (designers file sunglasses/jewelry
       // under "other" as often as "accessories"); garments are exempt so a
       // "belted waist" description can't turn a coat into a belt search
-      const guards = ["tops", "bottoms", "dresses", "outerwear"].includes(piece.category)
+      const isGarmentPiece = ["tops", "bottoms", "dresses", "outerwear"].includes(piece.category);
+      const guards = isGarmentPiece
         ? []
         : ROLE_GUARDS.filter(([role]) => role.test(`${piece.role} ${piece.description}`)).map(([, ok]) => ok);
+      if (isGarmentPiece) {
+        // Reverse guard: a garment piece must never be filled by an
+        // accessory product (a woven tote once matched "wide-leg trousers")
+        const ACC_TEXT =
+          /\bbags?\b|\btotes?\b|clutch|crossbody|satchel|hobo|\bmules?\b|loafer|sandal|sneaker|trainer|slingback|\bheels?\b|\bearrings?\b|necklace|bracelet|bangle|\brings?\b|\bwatch(es)?\b|sunglass|\bbelts?\b|\bscar(f|ves)\b/i;
+        candidates = candidates.filter((p) => !ACC_TEXT.test(productText(p)));
+      }
       if (guards.length > 0) {
         candidates = candidates.filter((p) => guards.some((ok) => ok.test(productText(p))));
         // Keywords missed but the catalogs still hold real items of this
