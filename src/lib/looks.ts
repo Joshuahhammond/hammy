@@ -432,8 +432,11 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     // Normalize garment visual weight: reference boards read as a grid of
     // same-scale products, but retailer photos fill their frames
     // differently, so slot math alone lets one tall cutout dominate.
+    // Bands catch OUTLIERS only — ceilings sit at the templates' own slot
+    // sizes (reference shirts run 33-44% wide), so normal garments pass
+    // through untouched and nothing shrinks to "mini"
     const BANDS: Record<string, [number, number]> = {
-      head: [20, 26], bottom: [36, 52], dress: [52, 72],
+      head: [22, 36], bottom: [36, 56], dress: [50, 76],
     };
     for (const p of placed) {
       const kind = heads.includes(p.item) ? "head"
@@ -444,7 +447,7 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
       let target = Math.min(hi, Math.max(lo, p.slot.height));
       // Wide pieces (shorts) hit their width cap before their height
       // floor — never let banding blow an item past its column width
-      const MAX_W: Record<string, number> = { head: 32, bottom: 36, dress: 34 };
+      const MAX_W: Record<string, number> = { head: 44, bottom: 44, dress: 42 };
       const wouldW = p.slot.width * (target / p.slot.height);
       if (wouldW > MAX_W[kind]) {
         target = p.slot.height * (MAX_W[kind] / p.slot.width);
