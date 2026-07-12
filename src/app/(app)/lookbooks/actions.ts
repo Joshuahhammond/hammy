@@ -272,13 +272,17 @@ async function runLookbookGeneration({
       chosen.map((c, ci) => ({ item: ci, imageUrl: c.product.image, want: wantFor(ci) }))
     );
     const replacements = new Map<number, (typeof all)[number]>();
+    const claimedAlts = new Set<string>(); // two failed pieces must not swap to the same product
     chosen.forEach((c, ci) => {
       if (verdicts.get(ci) !== false) return;
       const seen = seenPerOutfit.get(c.outfit) ?? new Set<string>();
       const alt = (poolByPiece.get(c.pieceIdx) ?? []).find(
-        (p) => p.url !== c.product.url && !seen.has(p.url)
+        (p) => p.url !== c.product.url && !seen.has(p.url) && !claimedAlts.has(p.url)
       );
-      if (alt) replacements.set(ci, alt);
+      if (alt) {
+        claimedAlts.add(alt.url);
+        replacements.set(ci, alt);
+      }
     });
     const altVerdicts = replacements.size
       ? await verifyPaletteMatches(

@@ -6,9 +6,10 @@ import { formatPrice } from "@/lib/color";
  * and blended onto a single white canvas, Hue & Stripe style.
  */
 export function LookBoard({ items, label }: { items: LookItem[]; label?: string }) {
-  // AI-critiqued positions (persisted at generation) beat the live layout
-  const placed = composeLook(items).map((p) =>
-    p.item.slot ? { ...p, slot: p.item.slot } : p
+  // AI-critiqued positions (persisted at generation) beat the live layout;
+  // items the art director benched stay off the canvas entirely
+  const placed = composeLook(items.filter((i) => !i.slot?.benched)).map((p) =>
+    p.item.slot && !p.item.slot.benched ? { ...p, slot: p.item.slot } : p
   );
 
   return (

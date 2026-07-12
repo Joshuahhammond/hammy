@@ -125,7 +125,9 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
         })
       );
 
-      const placed = composeLook(items);
+      let activeItems = items;
+      const benchedIds = new Set<string>();
+      let placed = composeLook(activeItems);
       if (placed.length < 3) continue;
 
       for (let round = 0; round < 3; round++) {
@@ -160,9 +162,19 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
         const out = response.parsed_output;
         if (!out || out.looks_professional || (out.bench.length === 0 && out.nudges.length === 0))
           break;
-        // Bench in descending index order so numbers stay valid
-        for (const bi of [...new Set(out.bench)].sort((a, b) => b - a)) {
-          if (placed[bi]) placed.splice(bi, 1);
+        if (out.bench.length > 0) {
+          // Recompose the whole board without the benched items — holes
+          // where they stood would read worse than the clutter did
+          for (const bi of new Set(out.bench)) {
+            const p = placed[bi];
+            if (p) benchedIds.add(p.item.id);
+          }
+          activeItems = activeItems.filter((i) => !benchedIds.has(i.id));
+          placed = composeLook(activeItems);
+          console.log(
+            `[lookbook ${lookbookId}] critique look ${no} round ${round + 1}: ${out.bench.length} benched (recomposed)`
+          );
+          continue; // fresh render next round
         }
         for (const adj of out.nudges) {
           const p = placed[adj.item];
@@ -176,16 +188,18 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
         // Re-normalize: fill the canvas and re-clamp margins
         autoscale(placed);
         console.log(
-          `[lookbook ${lookbookId}] critique look ${no} round ${round + 1}: ${out.bench.length} benched, ${out.nudges.length} nudges`
+          `[lookbook ${lookbookId}] critique look ${no} round ${round + 1}: ${out.nudges.length} nudges`
         );
-        if (out.bench.length > 0) continue; // benching changes the legend — re-render
       }
 
-      await Promise.all(
-        placed.map(({ item, slot }) =>
+      await Promise.all([
+        ...placed.map(({ item, slot }) =>
           db.from("lookbook_items").update({ slot }).eq("id", item.id)
-        )
-      );
+        ),
+        ...[...benchedIds].map((id) =>
+          db.from("lookbook_items").update({ slot: { benched: true } }).eq("id", id)
+        ),
+      ]);
     } catch (err) {
       console.error(`[lookbook ${lookbookId}] critique skipped for look ${no}:`, err);
     }
