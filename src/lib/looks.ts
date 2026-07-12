@@ -15,6 +15,8 @@ export type LookItem = {
   note: string;
   /** explicit outfit number (0 = ungrouped legacy items) */
   look_no?: number;
+  /** cutout image aspect ratio (w/h), probed at render time */
+  aspect?: number | null;
 };
 
 /** Group by explicit outfit numbers when present, else fall back to recipe */
@@ -277,10 +279,20 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     if (!fits) continue;
     const cap: Partial<Record<SlotKind, number>> = {};
     let score = 0;
+    let garmentSlots = 0;
+    let garmentFilled = 0;
     for (const s of t.slots) {
       cap[s.kind] = (cap[s.kind] ?? 0) + 1;
-      if (cap[s.kind]! <= byKind[s.kind].length) score++;
+      const filled = cap[s.kind]! <= byKind[s.kind].length;
+      if (filled) score++;
+      if (["head", "bottom", "dress"].includes(s.kind)) {
+        garmentSlots++;
+        if (filled) garmentFilled++;
+      }
     }
+    // A grid with empty garment zones reads as holes — the adaptive packer
+    // composes missing-piece looks better than a gappy template
+    if (garmentSlots > 0 && garmentFilled / garmentSlots < 0.7) continue;
     if (score > bestScore) {
       template = t;
       bestScore = score;
@@ -389,12 +401,53 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   return autoscale(placed);
 }
 
+// Canvas is 4:5 — percent units are not square, so aspect math must
+// convert through these factors
+const CANVAS_W = 4;
+const CANVAS_H = 5;
+
+/**
+ * Slot boxes lie: object-contain letterboxes any image whose aspect differs
+ * from the box, so the visible item is smaller than its slot and boards
+ * read scattered even when boxes touch. When the cutout's real aspect is
+ * known, shrink each slot to the exact rendered rectangle (honoring the
+ * slot's align anchors) so composition and autoscaling operate on truth.
+ */
+function truthBoxes(placed: Array<{ item: LookItem; slot: Slot }>): void {
+  for (const p of placed) {
+    const ar = p.item.aspect;
+    if (!ar) continue;
+    const s = p.slot;
+    const bw = s.width * CANVAS_W; // box in shared units
+    const bh = s.height * CANVAS_H;
+    let w = bw;
+    let h = bw / ar;
+    if (h > bh) {
+      h = bh;
+      w = bh * ar;
+    }
+    const wPct = w / CANVAS_W;
+    const hPct = h / CANVAS_H;
+    s.left =
+      s.alignX === "left" ? s.left
+      : s.alignX === "right" ? s.left + s.width - wPct
+      : s.left + (s.width - wPct) / 2;
+    s.top =
+      s.align === "top" ? s.top
+      : s.align === "bottom" ? s.top + s.height - hPct
+      : s.top + (s.height - hPct) / 2;
+    s.width = wPct;
+    s.height = hPct;
+  }
+}
+
 // References are dense edge-to-edge: a sparse board scales its whole
 // cluster up around the canvas center instead of floating tiny pieces.
 function autoscale(
   placed: Array<{ item: LookItem; slot: Slot }>
 ): Array<{ item: LookItem; slot: Slot }> {
   if (placed.length === 0) return placed;
+  truthBoxes(placed);
   const minL = Math.min(...placed.map(({ slot }) => slot.left));
   const maxR = Math.max(...placed.map(({ slot }) => slot.left + slot.width));
   const minT = Math.min(...placed.map(({ slot }) => slot.top));

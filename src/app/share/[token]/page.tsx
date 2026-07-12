@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { groupLookbookItems, type LookItem } from "@/lib/looks";
+import { groupLookbookItems, isCutout, type LookItem } from "@/lib/looks";
 import { LookBoard } from "@/components/look-board";
+import { probeAspect } from "@/lib/dims";
 import type { SharedLookbook } from "@/lib/types";
 
 type Props = { params: Promise<{ token: string }> };
@@ -32,18 +33,23 @@ export default async function SharedLookbookPage({ params }: Props) {
   const stylistName =
     lookbook.stylist.business_name || lookbook.stylist.full_name || "Your stylist";
 
-  const items: LookItem[] = lookbook.items.map((i) => ({
-    id: i.id,
-    name: i.name,
-    brand: i.brand,
-    category: i.category,
-    price_cents: i.price_cents,
-    product_url: i.product_url,
-    image_url: i.image_url,
-    color_hex: i.color_hex,
-    note: i.note,
-    look_no: i.look_no,
-  }));
+  // Probe each cutout's real aspect ratio so the board lays out the
+  // visible pixels, not letterboxed bounding boxes
+  const items: LookItem[] = await Promise.all(
+    lookbook.items.map(async (i) => ({
+      id: i.id,
+      name: i.name,
+      brand: i.brand,
+      category: i.category,
+      price_cents: i.price_cents,
+      product_url: i.product_url,
+      image_url: i.image_url,
+      color_hex: i.color_hex,
+      note: i.note,
+      look_no: i.look_no,
+      aspect: isCutout(i.image_url) ? await probeAspect(i.image_url) : null,
+    }))
+  );
   const looks = groupLookbookItems(items);
 
   return (
