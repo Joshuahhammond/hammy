@@ -459,9 +459,14 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     // Cascade: when several tops share a column (the reference "rack of
     // shirts" look), chain them by TRUE rects — each shirt overlaps the
     // top third of the one beneath, staggered slightly, painting downward.
-    const headPs = heads
-      .map((h) => placed.find((p) => p.item === h))
-      .filter((p): p is NonNullable<typeof p> => Boolean(p));
+    // Rack boards only: with 2+ bottoms the tops belong to separate
+    // dressed columns and must never chain into each other.
+    const cascadeOk = heads.length >= 3 && bottoms.length <= 1;
+    const headPs = cascadeOk
+      ? heads
+          .map((h) => placed.find((p) => p.item === h))
+          .filter((p): p is NonNullable<typeof p> => Boolean(p))
+      : [];
     const chained = new Set<number>();
     for (let i = 0; i < headPs.length; i++) {
       if (chained.has(i)) continue;

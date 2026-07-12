@@ -406,7 +406,7 @@ export async function verifyPaletteMatches(
               ]),
               {
                 type: "text" as const,
-                text: "For each numbered item judge ONLY color: does the product photo's dominant color belong to the designed color family? Neutrals (black, white, cream, tan, brown, grey, denim, natural leather, tortoise, gold, silver) are compatible with any palette unless the design names a different specific color. BE CONSERVATIVE: if the color is plausibly compatible, adjacent in tone (coffee vs dark brown, ivory vs white), or you are unsure, mark ok=true. Mark ok=false ONLY for an obvious clash — a saturated or clearly different hue family the design does not name.",
+                text: "For each numbered item judge ONLY color: does the product photo's dominant color belong to the designed color family? Neutrals (black, white, cream, tan, brown, grey, natural leather, tortoise, gold, silver) are compatible with any palette unless the design names a different specific color. Blue and denim count as neutral ONLY when the designed piece or palette mentions blue or denim. BE CONSERVATIVE within a hue family: adjacent tones pass (coffee vs dark brown, ivory vs white). Mark ok=false for a clearly different hue family the design does not name — a powder-blue tee in a black/ivory/camel story is a clash.",
               },
             ],
           },

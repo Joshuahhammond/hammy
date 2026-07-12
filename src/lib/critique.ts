@@ -65,16 +65,20 @@ const CritiqueSchema = z.object({
   looks_professional: z
     .boolean()
     .describe("true if the board already matches the reference rules and needs no changes"),
-  adjustments: z
+  bench: z
+    .array(z.number())
+    .describe(
+      "Item numbers to REMOVE from the canvas entirely (they stay in the product strip below). Use for clutter: duplicate accessory kinds, items sitting on top of a garment's body, photo-cards that break the collage"
+    ),
+  nudges: z
     .array(
       z.object({
         item: z.number().describe("The item's number from the legend"),
-        dx: z.number().describe("Horizontal shift in percent of canvas width (-20..20, negative = left)"),
-        dy: z.number().describe("Vertical shift in percent of canvas height (-20..20, negative = up)"),
-        scale: z.number().describe("Size multiplier (0.7..1.4, 1 = keep)"),
+        dx: z.number().describe("Small horizontal shift, percent (-8..8, negative = left)"),
+        dy: z.number().describe("Small vertical shift, percent (-8..8, negative = up)"),
       })
     )
-    .describe("Nudges for ONLY the items that need moving; empty if none"),
+    .describe("Small position corrections only — you cannot resize items"),
 });
 
 /**
@@ -146,7 +150,7 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
                 },
                 {
                   type: "text" as const,
-                  text: `This is a stylist's outfit collage. Items by number:\n${legend}\n\nJudge it against professional reference rules: (1) nothing clipped by or touching the canvas edge — keep a clean ~4% margin frame; (2) garments read at uniform scale, in dressed columns with each bottom's waistband a small even gap under its top's hem; (3) accessories follow dressing order — sunglasses near the top, necklace at a neckline, belt at a waist junction in open space, shoes clustered at the foot; (4) even gutters, no accidental collisions (a deliberate tuck like a shoe overlapping a trouser hem or shirts layered in a cascade is good; an accessory or shoe sitting ON TOP of a garment's body is not); (5) the composition must FILL the canvas — spread items so no region larger than ~20% of the board is empty; never crowd everything into one corner. Return nudges only for items that need them (dx/dy percent, scale). If it already reads professional, set looks_professional=true with no adjustments.`,
+                  text: `This is a stylist's outfit collage. Items by number:\n${legend}\n\nYou are the final quality gate, not the designer — the layout engine already placed everything by its rules. Your ONLY tools: BENCH an item (removes it from the canvas; it stays in the product strip) and small nudges (±8%). Bench anything that ruins the board: an item sitting ON TOP of a garment's body, a duplicate accessory kind, a white photo-card rectangle, a garment so mis-scaled it reads as clutter. Nudge only to fix a small collision or close a small gap. Most boards need NOTHING — if it reads professional, set looks_professional=true with empty lists. Never try to redesign the composition.`,
                 },
               ],
             },
@@ -154,25 +158,27 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
           output_config: { format: zodOutputFormat(CritiqueSchema) },
         });
         const out = response.parsed_output;
-        if (!out || out.looks_professional || out.adjustments.length === 0) break;
-        for (const adj of out.adjustments) {
+        if (!out || out.looks_professional || (out.bench.length === 0 && out.nudges.length === 0))
+          break;
+        // Bench in descending index order so numbers stay valid
+        for (const bi of [...new Set(out.bench)].sort((a, b) => b - a)) {
+          if (placed[bi]) placed.splice(bi, 1);
+        }
+        for (const adj of out.nudges) {
           const p = placed[adj.item];
           if (!p) continue;
           const s = p.slot;
-          const scale = Math.min(1.4, Math.max(0.7, adj.scale || 1));
-          const cx = s.left + s.width / 2 + Math.max(-30, Math.min(30, adj.dx || 0));
-          const cy = s.top + s.height / 2 + Math.max(-30, Math.min(30, adj.dy || 0));
-          s.width *= scale;
-          s.height *= scale;
-          s.left = Math.min(97 - s.width, Math.max(3, cx - s.width / 2));
-          s.top = Math.min(98 - s.height, Math.max(1.5, cy - s.height / 2));
+          s.left += Math.max(-8, Math.min(8, adj.dx || 0));
+          s.top += Math.max(-8, Math.min(8, adj.dy || 0));
+          s.left = Math.min(97 - s.width, Math.max(3, s.left));
+          s.top = Math.min(98 - s.height, Math.max(1.5, s.top));
         }
-        // Re-normalize after nudges: fill the canvas and re-clamp margins,
-        // so a round of moves can never persist a crowded corner + void
+        // Re-normalize: fill the canvas and re-clamp margins
         autoscale(placed);
         console.log(
-          `[lookbook ${lookbookId}] critique look ${no} round ${round + 1}: ${out.adjustments.length} nudges`
+          `[lookbook ${lookbookId}] critique look ${no} round ${round + 1}: ${out.bench.length} benched, ${out.nudges.length} nudges`
         );
+        if (out.bench.length > 0) continue; // benching changes the legend — re-render
       }
 
       await Promise.all(
