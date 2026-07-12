@@ -9,6 +9,22 @@ export type Source = {
 };
 
 export const SOURCES: Source[] = [
+  // --- elevated boutique: modern, cute, dressy (Bohme / Nordstrom-counter energy)
+  { id: "bohme", name: "Bohme", domain: "bohme.com", vibe: "elevated boutique — modern cute dresses, textured knits, trend-forward feminine outfits; the Nordstrom-counter look" },
+  { id: "evereve", name: "Evereve", domain: "evereve.com", vibe: "elevated contemporary for stylish moms — polished denim, dressy tops, Nordstrom-adjacent brands" },
+  { id: "ivycity", name: "Ivy City Co", domain: "ivycityco.com", vibe: "dressy feminine occasion dresses — tulle, florals, church-to-brunch cute" },
+  { id: "morninglavender", name: "Morning Lavender", domain: "morninglavender.com", vibe: "feminine boutique — ruffles, lace, florals, workwear-cute dresses and blouses" },
+  { id: "roolee", name: "ROOLEE", domain: "roolee.com", vibe: "modern cute boutique — flowy dresses, elevated casual, soft feminine color stories" },
+  { id: "piperandscoot", name: "Piper & Scoot", domain: "piperandscoot.com", vibe: "cute modern boutique — dressy-casual feminine, prints and statement details" },
+  { id: "selfieleslie", name: "Selfie Leslie", domain: "selfieleslie.com", vibe: "going-out and event dresses — satin, bodycon, dressy modern glam" },
+  { id: "beginningboutique", name: "Beginning Boutique", domain: "beginningboutique.com.au", vibe: "Aussie boutique — trendy cute dresses, event and festival looks (AUD prices)" },
+  { id: "saboskirt", name: "SABO", domain: "saboskirt.com", vibe: "elevated resort and event wear — silky dresses, linen sets, beachy glam (AUD prices)" },
+  { id: "vestique", name: "Vestique", domain: "vestique.com", vibe: "southern boutique — cute preppy-feminine dresses and matching sets" },
+  { id: "magnoliaboutique", name: "Magnolia Boutique", domain: "magnoliaboutique.com", vibe: "boutique feminine — boho-cute dresses, embroidered details, date-night looks" },
+  { id: "pinkblush", name: "PinkBlush", domain: "shoppinkblush.com", vibe: "feminine boutique dresses and soft cute staples (incl. maternity)" },
+  { id: "jessakae", name: "JessaKae", domain: "jessakae.com", vibe: "dressy feminine — puff sleeves, florals, size-inclusive statement dresses" },
+  { id: "dressup", name: "Dress Up", domain: "shopdressup.com", vibe: "affordable cute boutique — dresses, sets, modern feminine everyday" },
+  // --- modern minimalist / staples
   { id: "everlane", name: "Everlane", domain: "everlane.com", vibe: "modern minimalist basics, denim, workwear staples; men + women; mid-range" },
   { id: "jennikayne", name: "Jenni Kayne", domain: "jennikayne.com", vibe: "quiet luxury, coastal California, cashmere and neutrals; premium" },
   { id: "doen", name: "DÔEN", domain: "shopdoen.com", vibe: "romantic vintage-inspired California dresses and blouses; premium" },
