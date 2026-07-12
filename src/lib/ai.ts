@@ -265,6 +265,16 @@ export async function extractProductFromPage(
   return response.parsed_output;
 }
 
+/**
+ * Vision tasks (pick / locate) don't need full-res photos — Shopify CDNs
+ * serve resized variants via ?width=, cutting image tokens ~5-8x. Bounding
+ * boxes are percentages, so downstream crops still use the original.
+ */
+const visionThumb = (url: string): string => {
+  if (!url.includes("cdn.shopify.com")) return url;
+  return url.includes("?") ? `${url}&width=640` : `${url}?width=640`;
+};
+
 const BestImageSchema = z.object({
   index: z
     .number()
@@ -295,7 +305,7 @@ export async function pickBestImage(imageUrls: string[]): Promise<BestImage> {
           content: [
             ...imageUrls.slice(0, 4).map((url) => ({
               type: "image" as const,
-              source: { type: "url" as const, url },
+              source: { type: "url" as const, url: visionThumb(url) },
             })),
             {
               type: "text" as const,
@@ -342,7 +352,7 @@ export async function locateGarment(
         {
           role: "user",
           content: [
-            { type: "image" as const, source: { type: "url" as const, url: imageUrl } },
+            { type: "image" as const, source: { type: "url" as const, url: visionThumb(imageUrl) } },
             {
               type: "text" as const,
               text: `Find the "${productName}" in this photo. Return a tight bounding box around ONLY that product as percentages of the image (0-100). Exclude the model's head/face entirely, and exclude body parts that aren't covered by the product. A little margin (2-3%) around the product is good.`,
