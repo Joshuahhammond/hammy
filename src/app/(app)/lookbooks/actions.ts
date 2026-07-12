@@ -138,15 +138,50 @@ async function runLookbookGeneration({
     const catalogs = await Promise.all(stores.map((s) => fetchStoreProducts(s)));
     const all = catalogs.flat();
 
+    // Accessory/shoe pools must be role-plausible: keyword noise ("gold",
+    // "thin") otherwise floods them with garments, and the auto-fill below
+    // would ship a blue tee as "earrings".
+    const ROLE_GUARDS: Array<[RegExp, RegExp]> = [
+      [/earring|hoop|stud/i, /earring|hoop|stud/i],
+      [/necklace|pendant|choker|lariat/i, /necklace|pendant|choker|lariat|chain/i],
+      [/bracelet|bangle|cuff/i, /bracelet|bangle|cuff/i],
+      [/\brings?\b|signet/i, /\brings?\b|signet/i],
+      [/watch/i, /watch/i],
+      [/jewel/i, /earring|hoop|stud|necklace|pendant|bracelet|bangle|cuff|\bring\b|jewel/i],
+      [/sunglass/i, /sunglass|eyewear|frames/i],
+      [/belt/i, /belt/i],
+      [/scarf|stole/i, /scarf|stole|bandana/i],
+      [/bag|tote|clutch|crossbody|satchel/i, /bag|tote|clutch|crossbody|satchel|hobo|pouch/i],
+      [/shoe|heel|mule|loafer|\bflats?\b|sandal|boot|slingback|ballerina|pump|sneaker/i,
+        /shoe|heel|mule|loafer|\bflats?\b|sandal|boot|slingback|ballerina|pump|sneaker|slide/i],
+    ];
+    const productText = (p: (typeof all)[number]) =>
+      `${p.title} ${p.productType} ${p.tags.join(" ")}`;
+
     const pool: typeof all = [];
     const lines: string[] = [];
     const poolByPiece = new Map<number, typeof all>();
     flatPieces.forEach((piece, pi) => {
-      let matchesForPiece = filterByKeywords(all, piece.keywords).slice(0, 12);
+      let candidates = filterByKeywords(all, piece.keywords);
       // Zero candidates → retry with just the strongest (first two) stems
-      if (matchesForPiece.length === 0 && piece.keywords.length > 2) {
-        matchesForPiece = filterByKeywords(all, piece.keywords.slice(0, 2)).slice(0, 12);
+      if (candidates.length === 0 && piece.keywords.length > 2) {
+        candidates = filterByKeywords(all, piece.keywords.slice(0, 2));
       }
+      // Guard every non-garment piece (designers file sunglasses/jewelry
+      // under "other" as often as "accessories"); garments are exempt so a
+      // "belted waist" description can't turn a coat into a belt search
+      const guards = ["tops", "bottoms", "dresses", "outerwear"].includes(piece.category)
+        ? []
+        : ROLE_GUARDS.filter(([role]) => role.test(`${piece.role} ${piece.description}`)).map(([, ok]) => ok);
+      if (guards.length > 0) {
+        candidates = candidates.filter((p) => guards.some((ok) => ok.test(productText(p))));
+        // Keywords missed but the catalogs still hold real items of this
+        // kind — better an off-keyword earring than none at all
+        if (candidates.length === 0) {
+          candidates = all.filter((p) => guards.some((ok) => ok.test(productText(p))));
+        }
+      }
+      const matchesForPiece = candidates.slice(0, 12);
       poolByPiece.set(pi, matchesForPiece);
       console.log(
         `[lookbook ${lookbookId}] piece ${pi} (${piece.role}) kw=[${piece.keywords.join(",")}] → ${matchesForPiece.length} candidates`

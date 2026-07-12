@@ -153,6 +153,12 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     // No garment for the column top — bottoms take the full height
     put(bottoms[0], { left: 6, top: 3, width: 42, height: 78, z: 2, rotate: 0 });
     put(bottoms[1], { left: 54, top: 5, width: 42, height: 76, z: 2, rotate: 0 });
+  } else if (bottoms.length === 0) {
+    // Tops-only outfit: garments sit side-by-side large so the canvas
+    // stays full instead of leaving the whole lower half empty
+    put(heads[0], { left: 6, top: 4, width: 46, height: 60, z: 3, rotate: 0 });
+    put(heads[1], { left: 52, top: 8, width: 44, height: 56, z: 2, rotate: 0 });
+    put(heads[2], { left: 28, top: 60, width: 36, height: 26, z: 4, rotate: 0 });
   } else {
     // The dressed column: the top's hem meets the trouser's waistband on a
     // shared center axis. Overlap is an earned privilege of clean flat
@@ -191,6 +197,26 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   put(jewelry[1], { left: 5, top: 26, width: 7, height: 7, z: 6, rotate: 4, alignX: "left" });
   put(others[0], { left: 82, top: 64, width: 14, height: 12, z: 5, rotate: 3, alignX: "right" });
   put(others[1], { left: 3, top: 44, width: 13, height: 11, z: 5, rotate: -4, alignX: "left" });
+
+  // References are dense edge-to-edge: a sparse board scales its whole
+  // cluster up around the canvas center instead of floating tiny pieces.
+  if (placed.length > 0) {
+    const minL = Math.min(...placed.map(({ slot }) => slot.left));
+    const maxR = Math.max(...placed.map(({ slot }) => slot.left + slot.width));
+    const minT = Math.min(...placed.map(({ slot }) => slot.top));
+    const maxB = Math.max(...placed.map(({ slot }) => slot.top + slot.height));
+    const s = Math.min(1.3, 92 / Math.max(1, maxR - minL), 92 / Math.max(1, maxB - minT));
+    if (s > 1.02) {
+      const cx = (minL + maxR) / 2;
+      const cy = (minT + maxB) / 2;
+      for (const { slot } of placed) {
+        slot.left = 50 + (slot.left - cx) * s;
+        slot.top = 50 + (slot.top - cy) * s;
+        slot.width *= s;
+        slot.height *= s;
+      }
+    }
+  }
 
   return placed;
 }
