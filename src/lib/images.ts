@@ -57,7 +57,9 @@ export async function processProductImage(
       const alpha = stats.channels[3];
       const coverage = (alpha?.mean ?? 255) / 255;
       if (coverage < 0.2) {
-        upload = await sharp(sourceBuf).png().toBuffer();
+        // Trim the rectangle tight to its content so a white product photo
+        // blends into the canvas like a cutout instead of reading as a card
+        upload = await sharp(sourceBuf).trim({ threshold: 25 }).png().toBuffer();
       }
     } catch {
       // stats failed — keep the cutout as-is

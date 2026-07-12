@@ -192,6 +192,8 @@ async function runLookbookGeneration({
     const matchedPieceIdx = new Set(matches.map((m) => m.piece));
     flatPieces.forEach((piece, pi) => {
       if (matchedPieceIdx.has(pi)) return;
+      // Garments keep the strict omit rule — only accessories/shoes auto-fill
+      if (["tops", "bottoms", "dresses", "outerwear"].includes(piece.category)) return;
       const candidates = poolByPiece.get(pi) ?? [];
       const seen = seenPerOutfit.get(piece.outfit) ?? new Set<string>();
       const fallback = candidates.find((c) => !seen.has(c.url));
