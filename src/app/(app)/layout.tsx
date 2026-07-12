@@ -30,31 +30,31 @@ export default async function AppLayout({
     .single<Profile>();
 
   return (
-    <div className="flex min-h-screen bg-stone-50">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-stone-200 bg-white">
-        <Link href="/dashboard" className="px-5 py-5 text-lg font-semibold tracking-tight text-teal-700">
-          Hueline
+    <div className="flex min-h-screen bg-cream">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-bone bg-white">
+        <Link href="/dashboard" className="px-5 py-5 text-lg font-bold tracking-tight text-ink">
+          hammy
         </Link>
         <nav className="flex-1 space-y-1 px-3">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="block rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-ink/80 hover:bg-bone/60 hover:text-ink"
             >
               {item.label}
             </Link>
           ))}
         </nav>
-        <div className="border-t border-stone-200 px-5 py-4">
-          <p className="truncate text-sm font-medium text-stone-900">
+        <div className="border-t border-bone px-5 py-4">
+          <p className="truncate text-sm font-medium text-ink">
             {profile?.full_name || user.email}
           </p>
           {profile?.business_name && (
-            <p className="truncate text-xs text-stone-500">{profile.business_name}</p>
+            <p className="truncate text-xs text-ink/60">{profile.business_name}</p>
           )}
           <form action={signOut} className="mt-2">
-            <button type="submit" className="text-xs font-medium text-stone-500 hover:text-stone-800">
+            <button type="submit" className="text-xs font-medium text-ink/60 hover:text-ink">
               Sign out
             </button>
           </form>

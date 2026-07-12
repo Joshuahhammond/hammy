@@ -1,6 +1,6 @@
-# Hueline (working name)
+# hammy
 
-A toolbox for personal stylists and image consultants — a Hue & Stripe
+Warm-minimal toolbox for personal stylists and image consultants — a Hue & Stripe
 competitor. Stylists build branded lookbooks, track client wardrobes, and
 search their item library by exact color. Clients view shared lookbooks
 through a private link with no login.
@@ -60,3 +60,10 @@ Auth → Providers → Email for local development.
 - **New auth flows go through `src/proxy.ts`** (Next 16's middleware) — it
   refreshes the Supabase session cookie and gates `/dashboard`, `/clients`,
   `/items`, `/lookbooks`.
+
+## Brand
+
+Isola-inspired warm minimalism, lowercase wordmark. Tokens live in
+`src/app/globals.css` (`@theme`): cream `#f4f2ec` (paper), bone `#dad6c9`
+(panels/borders), taupe `#9b8570` (accent, default stylist brand color),
+ink `#1b1715` (text, primary buttons).

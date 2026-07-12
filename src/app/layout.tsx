@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Hueline — the stylist's toolbox",
-    template: "%s · Hueline",
+    default: "hammy — the stylist's toolbox",
+    template: "%s · hammy",
   },
   description:
     "Branded lookbooks, client wardrobe tracking, and color-exact apparel search for image professionals.",

@@ -28,43 +28,43 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <h1 className="text-2xl font-semibold text-stone-900">Dashboard</h1>
+      <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         {stats.map((s) => (
           <Link
             key={s.label}
             href={s.href}
-            className="rounded-xl border border-stone-200 bg-white p-5 hover:border-teal-600"
+            className="rounded-xl border border-bone bg-white p-5 hover:border-taupe"
           >
-            <p className="text-3xl font-semibold text-stone-900">{s.count}</p>
-            <p className="mt-1 text-sm text-stone-600">{s.label}</p>
+            <p className="text-3xl font-semibold text-ink">{s.count}</p>
+            <p className="mt-1 text-sm text-ink/70">{s.label}</p>
           </Link>
         ))}
       </div>
 
       <div className="mt-10">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-stone-900">Recent lookbooks</h2>
-          <Link href="/lookbooks" className="text-sm font-medium text-teal-700 hover:underline">
+          <h2 className="text-lg font-semibold text-ink">Recent lookbooks</h2>
+          <Link href="/lookbooks" className="text-sm font-medium text-taupe-dark hover:underline">
             View all
           </Link>
         </div>
         {recentLookbooks.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center text-sm text-stone-500">
+          <p className="mt-4 rounded-xl border border-dashed border-bone bg-white p-8 text-center text-sm text-ink/60">
             No lookbooks yet. Add some items to your library, then create your
             first lookbook.
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
+          <ul className="mt-4 divide-y divide-bone rounded-xl border border-bone bg-white">
             {recentLookbooks.map((lb) => (
               <li key={lb.id}>
                 <Link
                   href={`/lookbooks/${lb.id}`}
-                  className="flex items-center justify-between px-5 py-3 hover:bg-stone-50"
+                  className="flex items-center justify-between px-5 py-3 hover:bg-cream"
                 >
-                  <span className="text-sm font-medium text-stone-900">{lb.title}</span>
-                  <span className="text-xs text-stone-500">
+                  <span className="text-sm font-medium text-ink">{lb.title}</span>
+                  <span className="text-xs text-ink/60">
                     {new Date(lb.created_at).toLocaleDateString()}
                   </span>
                 </Link>

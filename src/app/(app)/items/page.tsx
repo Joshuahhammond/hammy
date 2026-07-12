@@ -24,18 +24,18 @@ export default async function ItemsPage({ searchParams }: Props) {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <h1 className="text-2xl font-semibold text-stone-900">Item library</h1>
-      <p className="mt-1 text-sm text-stone-500">
+      <h1 className="text-2xl font-semibold text-ink">Item library</h1>
+      <p className="mt-1 text-sm text-ink/60">
         Pieces you recommend to clients, indexed by color.
       </p>
 
-      <details className="mt-6 rounded-xl border border-stone-200 bg-white">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-teal-700">
+      <details className="mt-6 rounded-xl border border-bone bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-taupe-dark">
           + Add an item
         </summary>
-        <form action={addItem} className="flex flex-wrap items-end gap-3 border-t border-stone-100 p-4">
+        <form action={addItem} className="flex flex-wrap items-end gap-3 border-t border-bone/60 p-4">
           <div className="min-w-40 flex-1">
-            <label htmlFor="i-name" className="mb-1 block text-xs font-medium text-stone-600">
+            <label htmlFor="i-name" className="mb-1 block text-xs font-medium text-ink/70">
               Name
             </label>
             <input
@@ -43,27 +43,27 @@ export default async function ItemsPage({ searchParams }: Props) {
               name="name"
               required
               placeholder="Silk midi skirt"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              className="w-full rounded-md border border-bone px-3 py-2 text-sm focus:border-taupe focus:outline-none"
             />
           </div>
           <div className="w-32">
-            <label htmlFor="i-brand" className="mb-1 block text-xs font-medium text-stone-600">
+            <label htmlFor="i-brand" className="mb-1 block text-xs font-medium text-ink/70">
               Brand
             </label>
             <input
               id="i-brand"
               name="brand"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              className="w-full rounded-md border border-bone px-3 py-2 text-sm focus:border-taupe focus:outline-none"
             />
           </div>
           <div>
-            <label htmlFor="i-category" className="mb-1 block text-xs font-medium text-stone-600">
+            <label htmlFor="i-category" className="mb-1 block text-xs font-medium text-ink/70">
               Category
             </label>
             <select
               id="i-category"
               name="category"
-              className="rounded-md border border-stone-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              className="rounded-md border border-bone px-2 py-2 text-sm focus:border-taupe focus:outline-none"
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -73,7 +73,7 @@ export default async function ItemsPage({ searchParams }: Props) {
             </select>
           </div>
           <div className="w-24">
-            <label htmlFor="i-price" className="mb-1 block text-xs font-medium text-stone-600">
+            <label htmlFor="i-price" className="mb-1 block text-xs font-medium text-ink/70">
               Price ($)
             </label>
             <input
@@ -82,23 +82,23 @@ export default async function ItemsPage({ searchParams }: Props) {
               type="number"
               step="0.01"
               min="0"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              className="w-full rounded-md border border-bone px-3 py-2 text-sm focus:border-taupe focus:outline-none"
             />
           </div>
           <div>
-            <label htmlFor="i-color" className="mb-1 block text-xs font-medium text-stone-600">
+            <label htmlFor="i-color" className="mb-1 block text-xs font-medium text-ink/70">
               Color
             </label>
             <input
               id="i-color"
               name="color_hex"
               type="color"
-              defaultValue="#0d9488"
-              className="h-9 w-12 cursor-pointer rounded-md border border-stone-300"
+              defaultValue="#9b8570"
+              className="h-9 w-12 cursor-pointer rounded-md border border-bone"
             />
           </div>
           <div className="min-w-48 flex-1">
-            <label htmlFor="i-url" className="mb-1 block text-xs font-medium text-stone-600">
+            <label htmlFor="i-url" className="mb-1 block text-xs font-medium text-ink/70">
               Product URL
             </label>
             <input
@@ -106,11 +106,11 @@ export default async function ItemsPage({ searchParams }: Props) {
               name="product_url"
               type="url"
               placeholder="https://..."
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              className="w-full rounded-md border border-bone px-3 py-2 text-sm focus:border-taupe focus:outline-none"
             />
           </div>
           <div className="min-w-48 flex-1">
-            <label htmlFor="i-image" className="mb-1 block text-xs font-medium text-stone-600">
+            <label htmlFor="i-image" className="mb-1 block text-xs font-medium text-ink/70">
               Image URL
             </label>
             <input
@@ -118,12 +118,12 @@ export default async function ItemsPage({ searchParams }: Props) {
               name="image_url"
               type="url"
               placeholder="https://..."
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              className="w-full rounded-md border border-bone px-3 py-2 text-sm focus:border-taupe focus:outline-none"
             />
           </div>
           <button
             type="submit"
-            className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-taupe-dark"
           >
             Add item
           </button>
@@ -135,8 +135,8 @@ export default async function ItemsPage({ searchParams }: Props) {
           href="/items"
           className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
             !color
-              ? "border-stone-900 bg-stone-900 text-white"
-              : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
+              ? "border-ink bg-ink text-cream"
+              : "border-bone bg-white text-ink/80 hover:border-taupe"
           }`}
         >
           All colors
@@ -147,8 +147,8 @@ export default async function ItemsPage({ searchParams }: Props) {
             href={`/items?color=${f.key}`}
             className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
               color === f.key
-                ? "border-stone-900 bg-stone-900 text-white"
-                : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
+                ? "border-ink bg-ink text-cream"
+                : "border-bone bg-white text-ink/80 hover:border-taupe"
             }`}
           >
             <span className="h-3 w-3 rounded-full" style={{ backgroundColor: f.swatch }} />
@@ -158,7 +158,7 @@ export default async function ItemsPage({ searchParams }: Props) {
       </div>
 
       {items.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center text-sm text-stone-500">
+        <p className="mt-6 rounded-xl border border-dashed border-bone bg-white p-8 text-center text-sm text-ink/60">
           {color
             ? "No items in this color family yet."
             : "Your library is empty — add your first item above."}
@@ -166,7 +166,7 @@ export default async function ItemsPage({ searchParams }: Props) {
       ) : (
         <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
-            <li key={item.id} className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+            <li key={item.id} className="overflow-hidden rounded-xl border border-bone bg-white">
               {item.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element -- arbitrary retailer hosts; next/image needs per-domain config
                 <img
@@ -182,13 +182,13 @@ export default async function ItemsPage({ searchParams }: Props) {
               )}
               <div className="flex items-start gap-3 p-4">
                 <span
-                  className="mt-0.5 h-5 w-5 shrink-0 rounded-full border border-stone-200"
+                  className="mt-0.5 h-5 w-5 shrink-0 rounded-full border border-bone"
                   style={{ backgroundColor: item.color_hex }}
                   title={item.color_hex}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-stone-900">{item.name}</p>
-                  <p className="truncate text-xs text-stone-500">
+                  <p className="truncate text-sm font-medium text-ink">{item.name}</p>
+                  <p className="truncate text-xs text-ink/60">
                     {[item.brand, item.category, formatPrice(item.price_cents)]
                       .filter(Boolean)
                       .join(" · ")}
@@ -198,7 +198,7 @@ export default async function ItemsPage({ searchParams }: Props) {
                       href={item.product_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs font-medium text-teal-700 hover:underline"
+                      className="text-xs font-medium text-taupe-dark hover:underline"
                     >
                       View product ↗
                     </a>
@@ -209,7 +209,7 @@ export default async function ItemsPage({ searchParams }: Props) {
                   <button
                     type="submit"
                     aria-label={`Delete ${item.name}`}
-                    className="text-xs text-stone-400 hover:text-red-600"
+                    className="text-xs text-ink/50 hover:text-red-600"
                   >
                     ✕
                   </button>

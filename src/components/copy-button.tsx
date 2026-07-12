@@ -13,7 +13,7 @@ export function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-stone-500"
+      className="rounded-md border border-bone bg-white px-3 py-1.5 text-xs font-medium text-ink/80 hover:border-taupe"
     >
       {copied ? "Copied!" : "Copy link"}
     </button>

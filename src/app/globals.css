@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
+/* hammy brand palette (Isola-inspired: warm minimal, editorial) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f2ec;
+  --foreground: #1b1715;
 }
 
 @theme inline {
@@ -10,17 +11,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* brand tokens */
+  --color-cream: #f4f2ec; /* paper background */
+  --color-bone: #dad6c9; /* panels, borders */
+  --color-taupe: #9b8570; /* warm accent */
+  --color-taupe-dark: #7c6a58; /* accent hover / links */
+  --color-ink: #1b1715; /* espresso text + primary buttons */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
