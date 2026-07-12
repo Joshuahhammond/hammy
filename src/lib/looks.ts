@@ -319,6 +319,7 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     let score = 0;
     let garmentSlots = 0;
     let garmentFilled = 0;
+    let headsFilled = 0;
     for (const s of t.slots) {
       cap[s.kind] = (cap[s.kind] ?? 0) + 1;
       const filled = cap[s.kind]! <= byKind[s.kind].length;
@@ -326,6 +327,7 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
       if (["head", "bottom", "dress"].includes(s.kind)) {
         garmentSlots++;
         if (filled) garmentFilled++;
+        if (filled && s.kind === "head") headsFilled++;
       }
     }
     void score;
@@ -333,8 +335,10 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     // composes missing-piece looks better than a gappy template
     if (garmentSlots > 0 && garmentFilled / garmentSlots < 0.7) continue;
     // Garments decide the grid (accessories anchor anatomically anyway);
-    // ties go to the template with the fewest unfilled garment zones
-    const gScore = garmentFilled + garmentFilled / Math.max(1, garmentSlots);
+    // ties go to fewest unfilled garment zones, then to more tops shown
+    // (a 4-shirt look wants the cascade, not a 3-shirt grid)
+    const gScore =
+      garmentFilled + garmentFilled / Math.max(1, garmentSlots) + headsFilled * 0.01;
     if (gScore > bestScore) {
       template = t;
       bestScore = gScore;
@@ -452,6 +456,37 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
       p.slot.left = cx - p.slot.width / 2;
       p.slot.height = target; // top edge (collar / waistband) stays put
     }
+    // Cascade: when several tops share a column (the reference "rack of
+    // shirts" look), chain them by TRUE rects — each shirt overlaps the
+    // top third of the one beneath, staggered slightly, painting downward.
+    const headPs = heads
+      .map((h) => placed.find((p) => p.item === h))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p));
+    const chained = new Set<number>();
+    for (let i = 0; i < headPs.length; i++) {
+      if (chained.has(i)) continue;
+      const stack = [headPs[i]];
+      for (let j = i + 1; j < headPs.length; j++) {
+        if (chained.has(j)) continue;
+        const a = stack[stack.length - 1].slot;
+        const b = headPs[j].slot;
+        const overlap = Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left);
+        if (overlap > 0.4 * Math.min(a.width, b.width)) {
+          stack.push(headPs[j]);
+          chained.add(j);
+        }
+      }
+      if (stack.length < 2) continue;
+      stack.sort((a, b) => a.slot.top - b.slot.top);
+      for (let k = 1; k < stack.length; k++) {
+        const prev = stack[k - 1].slot;
+        const cur = stack[k].slot;
+        cur.top = prev.top + prev.height * 0.62; // deep deliberate overlap
+        cur.left = prev.left + (k % 2 === 0 ? 2 : -2); // collar stagger
+        cur.z = prev.z + 1; // lower shirt paints over the one above
+      }
+    }
+
     // Row lock: each bottom snaps its waistband to the hem of the top
     // sharing its column, closing vertical drift into an even gutter
     for (const b of bottoms) {
