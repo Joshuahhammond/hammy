@@ -141,7 +141,14 @@ async function runLookbookGeneration({
     const pool: typeof all = [];
     const lines: string[] = [];
     flatPieces.forEach((piece, pi) => {
-      const matchesForPiece = filterByKeywords(all, piece.keywords).slice(0, 10);
+      let matchesForPiece = filterByKeywords(all, piece.keywords).slice(0, 10);
+      // Zero candidates → retry with just the strongest (first two) stems
+      if (matchesForPiece.length === 0 && piece.keywords.length > 2) {
+        matchesForPiece = filterByKeywords(all, piece.keywords.slice(0, 2)).slice(0, 10);
+      }
+      console.log(
+        `[lookbook ${lookbookId}] piece ${pi} (${piece.role}) kw=[${piece.keywords.join(",")}] → ${matchesForPiece.length} candidates`
+      );
       for (const prod of matchesForPiece) {
         lines.push(
           `${pool.length}. [piece ${pi}: outfit ${piece.outfit + 1} ${piece.role}] ${prod.title} | ${prod.productType} | ${prod.storeName} | $${prod.price ?? "?"} | tags: ${prod.tags.slice(0, 4).join(", ")}`
@@ -180,6 +187,9 @@ async function runLookbookGeneration({
     }
     if (chosen.length === 0) throw new Error("Couldn't match the design to store inventory");
     chosen.sort((a, b) => a.outfit - b.outfit);
+    console.log(
+      `[lookbook ${lookbookId}] matched ${chosen.length}/${flatPieces.length} designed pieces (${matches.length} raw matches)`
+    );
 
     // 4. Photos in small batches (bg removal is CPU-heavy)
     const prepared: Array<{ pick: (typeof chosen)[number]; imageUrl: string }> = [];
