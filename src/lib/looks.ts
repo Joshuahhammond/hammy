@@ -194,9 +194,18 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     ? { left: 2, top: 55, width: 20, height: 20, z: 5, rotate: 0, alignX: "left" }
     : { left: 68, top: 52, width: 20, height: 20, z: 5, rotate: 0, alignX: "right" });
   put(belts[0], { left: 62, top: 30, width: 18, height: 11, z: 6, rotate: -8, alignX: "right" });
-  put(sunnies[0], { left: 4, top: 2, width: 16, height: 9, z: 6, rotate: -5, alignX: "left" });
-  put(jewelry[0], { left: 4, top: 14, width: 8, height: 8, z: 6, rotate: 0, alignX: "left" });
-  put(jewelry[1], { left: 5, top: 26, width: 7, height: 7, z: 6, rotate: 4, alignX: "left" });
+  // On dress boards the left corner is occupied by the satellite top, so
+  // trinkets move to the top-center gap (how the references style them);
+  // otherwise they stack down the left rail.
+  if (dress) {
+    put(sunnies[0], { left: 32, top: 0, width: 15, height: 8, z: 6, rotate: -5 });
+    put(jewelry[0], { left: 49, top: 1, width: 8, height: 8, z: 6, rotate: 0 });
+    put(jewelry[1], { left: 3, top: 35, width: 8, height: 8, z: 6, rotate: 4, alignX: "left" });
+  } else {
+    put(sunnies[0], { left: 4, top: 2, width: 16, height: 9, z: 6, rotate: -5, alignX: "left" });
+    put(jewelry[0], { left: 4, top: 14, width: 8, height: 8, z: 6, rotate: 0, alignX: "left" });
+    put(jewelry[1], { left: 5, top: 26, width: 7, height: 7, z: 6, rotate: 4, alignX: "left" });
+  }
   put(others[0], { left: 82, top: 64, width: 14, height: 12, z: 5, rotate: 3, alignX: "right" });
   put(others[1], { left: 3, top: 44, width: 13, height: 11, z: 5, rotate: -4, alignX: "left" });
 
