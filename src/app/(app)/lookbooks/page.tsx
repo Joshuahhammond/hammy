@@ -80,46 +80,51 @@ export default async function LookbooksPage({ searchParams }: Props) {
         <SubmitButton pendingLabel="Starting…">Generate lookbook</SubmitButton>
       </form>
 
-      <form
-        action={createLookbook}
-        className="mt-6 flex flex-wrap items-end gap-3 rounded-xl border border-bone bg-white p-4"
-      >
-        <div className="min-w-48 flex-1">
-          <label htmlFor="lb-title" className="mb-1 block text-xs font-medium text-ink/70">
-            Title
-          </label>
-          <input
-            id="lb-title"
-            name="title"
-            required
-            placeholder="Spring capsule for Anna"
-            className="w-full rounded-md border border-bone px-3 py-2 text-sm focus:border-taupe focus:outline-none"
-          />
-        </div>
-        <div>
-          <label htmlFor="lb-client" className="mb-1 block text-xs font-medium text-ink/70">
-            Client <span className="font-normal text-ink/50">(optional)</span>
-          </label>
-          <select
-            id="lb-client"
-            name="client_id"
-            className="rounded-md border border-bone px-2 py-2 text-sm focus:border-taupe focus:outline-none"
-          >
-            <option value="">No client</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-taupe-dark"
+      <details className="mt-4 rounded-xl border border-bone bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-taupe-dark">
+          + Or build one by hand (empty book, add pieces from your library)
+        </summary>
+        <form
+          action={createLookbook}
+          className="flex flex-wrap items-end gap-3 border-t border-bone/60 p-4"
         >
-          Create lookbook
-        </button>
-      </form>
+          <div className="min-w-48 flex-1">
+            <label htmlFor="lb-title" className="mb-1 block text-xs font-medium text-ink/70">
+              Title
+            </label>
+            <input
+              id="lb-title"
+              name="title"
+              required
+              placeholder="Spring capsule for Anna"
+              className="w-full rounded-md border border-bone px-3 py-2 text-sm focus:border-taupe focus:outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="lb-client" className="mb-1 block text-xs font-medium text-ink/70">
+              Client <span className="font-normal text-ink/50">(optional)</span>
+            </label>
+            <select
+              id="lb-client"
+              name="client_id"
+              className="rounded-md border border-bone px-2 py-2 text-sm focus:border-taupe focus:outline-none"
+            >
+              <option value="">No client</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-taupe-dark"
+          >
+            Create empty lookbook
+          </button>
+        </form>
+      </details>
 
       {lookbooks.length === 0 ? (
         <p className="mt-6 rounded-xl border border-dashed border-bone bg-white p-8 text-center text-sm text-ink/60">
