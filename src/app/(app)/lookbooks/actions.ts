@@ -2,13 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { createClient as createSupabaseJs, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { hexToHsl } from "@/lib/color";
-import { planDiscovery, designOutfit, matchPiecesToProducts, pickBestImage, locateGarment } from "@/lib/ai";
+import { planDiscovery, designLookbook, matchPiecesToProducts, pickBestImage, locateGarment } from "@/lib/ai";
 import { processProductImage } from "@/lib/images";
 import { SOURCES, sourceById } from "@/lib/sources";
 import { fetchStoreProducts, filterByKeywords } from "@/lib/shopify";
 
+/**
+ * Kicks off generation as a background job and returns immediately —
+ * phones kill requests after ~60s, and the pipeline runs 2-3 minutes.
+ * The detail page polls until the lookbook flips to 'ready'.
+ */
 export async function generateLookbookWithAi(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -19,7 +26,7 @@ export async function generateLookbookWithAi(formData: FormData) {
   const brief = String(formData.get("brief") ?? "").trim();
   if (!brief) return;
   const clientId = String(formData.get("client_id") ?? "");
-  const count = Math.min(Math.max(parseInt(String(formData.get("count") ?? "8"), 10) || 8, 2), 12);
+  const outfits = Math.min(Math.max(parseInt(String(formData.get("outfits") ?? "2"), 10) || 2, 1), 4);
 
   let clientName: string | null = null;
   if (clientId) {
@@ -31,22 +38,80 @@ export async function generateLookbookWithAi(formData: FormData) {
     clientName = data?.name ?? null;
   }
 
-  // Celebrity-stylist pipeline: DESIGN the complete look first (trend-informed,
-  // head-to-toe incl. accessories), then source each designed piece.
-  let spec;
-  let chosen: Array<{
-    product: NonNullable<Awaited<ReturnType<typeof fetchStoreProducts>>>[number];
-    category: string;
-    color_hex: string;
-    note: string;
-  }> = [];
-  try {
-    spec = await designOutfit(brief, clientName);
+  // The background task outlives this request's cookies — carry the user's
+  // session token so RLS still applies.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
 
-    const storeCatalog = SOURCES.map((s) => `${s.id}: ${s.name} — ${s.vibe}`).join("\n");
-    const pieceSummary = spec.pieces
-      .map((p, i) => `${i}. [${p.role}] ${p.description}`)
+  const { data: lookbook, error } = await supabase
+    .from("lookbooks")
+    .insert({
+      stylist_id: user.id,
+      title: "Styling in progress…",
+      description: brief,
+      client_id: clientId || null,
+      status: "generating",
+    })
+    .select("id")
+    .single();
+  if (error || !lookbook) {
+    redirect(`/lookbooks?error=${encodeURIComponent("Could not start the lookbook")}`);
+  }
+
+  const args = {
+    lookbookId: lookbook.id,
+    brief,
+    clientName,
+    outfitCount: outfits,
+    userId: user.id,
+    accessToken: session.access_token,
+  };
+  after(async () => {
+    await runLookbookGeneration(args);
+  });
+
+  revalidatePath("/lookbooks");
+  redirect(`/lookbooks/${lookbook.id}`);
+}
+
+async function runLookbookGeneration({
+  lookbookId,
+  brief,
+  clientName,
+  outfitCount,
+  userId,
+  accessToken,
+}: {
+  lookbookId: string;
+  brief: string;
+  clientName: string | null;
+  outfitCount: number;
+  userId: string;
+  accessToken: string;
+}) {
+  const db: SupabaseClient = createSupabaseJs(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    }
+  );
+
+  try {
+    // 1. Design a collection of complete outfits (trend-informed)
+    const spec = await designLookbook(brief, clientName, outfitCount);
+    const flatPieces = spec.outfits.flatMap((outfit, oi) =>
+      outfit.pieces.map((p) => ({ ...p, outfit: oi, outfitName: outfit.name }))
+    );
+    const pieceSummary = flatPieces
+      .map((p, i) => `${i}. [outfit ${p.outfit + 1} "${p.outfitName}" | ${p.role}] ${p.description}`)
       .join("\n");
+
+    // 2. Source candidates per designed piece
+    const storeCatalog = SOURCES.map((s) => `${s.id}: ${s.name} — ${s.vibe}`).join("\n");
     const plan = await planDiscovery(`${brief}. Pieces to source:\n${pieceSummary}`, storeCatalog);
     const stores = plan.store_ids
       .map(sourceById)
@@ -55,109 +120,111 @@ export async function generateLookbookWithAi(formData: FormData) {
     const catalogs = await Promise.all(stores.map((s) => fetchStoreProducts(s)));
     const all = catalogs.flat();
 
-    // Per-piece candidate pools, flattened with global indexes
     const pool: typeof all = [];
     const lines: string[] = [];
-    spec.pieces.forEach((piece, pi) => {
-      const matchesForPiece = filterByKeywords(all, piece.keywords).slice(0, 12);
+    flatPieces.forEach((piece, pi) => {
+      const matchesForPiece = filterByKeywords(all, piece.keywords).slice(0, 10);
       for (const prod of matchesForPiece) {
         lines.push(
-          `${pool.length}. [piece ${pi}: ${piece.role}] ${prod.title} | ${prod.productType} | ${prod.storeName} | $${prod.price ?? "?"} | tags: ${prod.tags.slice(0, 4).join(", ")}`
+          `${pool.length}. [piece ${pi}: outfit ${piece.outfit + 1} ${piece.role}] ${prod.title} | ${prod.productType} | ${prod.storeName} | $${prod.price ?? "?"} | tags: ${prod.tags.slice(0, 4).join(", ")}`
         );
         pool.push(prod);
       }
     });
-    if (pool.length === 0) {
-      redirect(
-        `/lookbooks?error=${encodeURIComponent("No store matches for this design — try broader wording")}`
-      );
-    }
+    if (pool.length === 0) throw new Error("No store matches for this design — try broader wording");
 
+    // 3. Match one real product per designed piece. A piece may reuse a
+    // product already placed in another outfit's slot — dedupe per outfit.
     const { matches } = await matchPiecesToProducts(pieceSummary, lines.join("\n"));
-    const seenUrls = new Set<string>();
+    const seenPerOutfit = new Map<number, Set<string>>();
+    const chosen: Array<{
+      product: (typeof all)[number];
+      category: string;
+      color_hex: string;
+      note: string;
+      outfit: number;
+    }> = [];
     for (const m of matches) {
       const product = pool[m.index];
-      const piece = spec.pieces[m.piece];
-      if (!product || !piece || seenUrls.has(product.url)) continue;
-      seenUrls.add(product.url);
-      chosen.push({ product, category: piece.category, color_hex: piece.color_hex, note: m.note });
+      const piece = flatPieces[m.piece];
+      if (!product || !piece) continue;
+      const seen = seenPerOutfit.get(piece.outfit) ?? new Set<string>();
+      if (seen.has(product.url)) continue;
+      seen.add(product.url);
+      seenPerOutfit.set(piece.outfit, seen);
+      chosen.push({
+        product,
+        category: piece.category,
+        color_hex: piece.color_hex,
+        note: m.note,
+        outfit: piece.outfit,
+      });
     }
-    chosen = chosen.slice(0, Math.max(count, spec.pieces.length));
-    if (chosen.length === 0) {
-      redirect(`/lookbooks?error=${encodeURIComponent("Couldn't match the design to store inventory")}`);
+    if (chosen.length === 0) throw new Error("Couldn't match the design to store inventory");
+    chosen.sort((a, b) => a.outfit - b.outfit);
+
+    // 4. Photos in small batches (bg removal is CPU-heavy)
+    const prepared: Array<{ pick: (typeof chosen)[number]; imageUrl: string }> = [];
+    for (let i = 0; i < chosen.length; i += 4) {
+      const batch = await Promise.all(
+        chosen.slice(i, i + 4).map(async (pick) => {
+          const { product } = pick;
+          const imgs = product.images.length > 0 ? product.images : [product.image];
+          const best = await pickBestImage(imgs);
+          const chosenUrl = imgs[best.index] ?? product.image;
+          const crop = best.flat ? null : await locateGarment(chosenUrl, product.title);
+          const imageUrl = await processProductImage(chosenUrl, userId, db, crop);
+          return { pick, imageUrl };
+        })
+      );
+      prepared.push(...batch);
     }
+
+    const { data: items, error: itemsError } = await db
+      .from("items")
+      .insert(
+        prepared.map(({ pick, imageUrl }) => {
+          const { h, s, l } = hexToHsl(pick.color_hex);
+          return {
+            stylist_id: userId,
+            name: pick.product.title.slice(0, 200),
+            brand: pick.product.vendor || pick.product.storeName,
+            category: pick.category,
+            price_cents: pick.product.price !== null ? Math.round(pick.product.price * 100) : null,
+            product_url: pick.product.url,
+            image_url: imageUrl,
+            color_hex: pick.color_hex,
+            hue: h,
+            saturation: s,
+            lightness: l,
+          };
+        })
+      )
+      .select("id");
+    if (itemsError || !items) throw new Error("Failed to save sourced items");
+
+    await db.from("lookbook_items").insert(
+      items.map((item, idx) => ({
+        lookbook_id: lookbookId,
+        item_id: item.id,
+        note: prepared[idx]?.pick.note ?? "",
+        position: idx + 1,
+        look_no: (prepared[idx]?.pick.outfit ?? 0) + 1,
+      }))
+    );
+
+    await db
+      .from("lookbooks")
+      .update({ title: spec.title, description: spec.description, status: "ready" })
+      .eq("id", lookbookId);
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI styling failed";
-    redirect(`/lookbooks?error=${encodeURIComponent(message)}`);
+    console.error("lookbook generation failed:", err);
+    await db
+      .from("lookbooks")
+      .update({ status: "error", description: `Generation failed: ${message}` })
+      .eq("id", lookbookId);
   }
-
-  // Photos: flats cut out directly; on-model shots get a headless garment
-  // crop first so every piece lands on the collage
-  const prepared = await Promise.all(
-    chosen.map(async (pick) => {
-      const { product } = pick;
-      const pool = product.images.length > 0 ? product.images : [product.image];
-      const best = await pickBestImage(pool);
-      const chosenUrl = pool[best.index] ?? product.image;
-      const crop = best.flat ? null : await locateGarment(chosenUrl, product.title);
-      const imageUrl = await processProductImage(chosenUrl, user.id, supabase, crop);
-      return { pick, product, imageUrl };
-    })
-  );
-
-  const { data: items, error: itemsError } = await supabase
-    .from("items")
-    .insert(
-      prepared.map(({ pick, product, imageUrl }) => {
-        const { h, s, l } = hexToHsl(pick.color_hex);
-        return {
-          stylist_id: user.id,
-          name: product.title.slice(0, 200),
-          brand: product.vendor || product.storeName,
-          category: pick.category,
-          price_cents: product.price !== null ? Math.round(product.price * 100) : null,
-          product_url: product.url,
-          image_url: imageUrl,
-          color_hex: pick.color_hex,
-          hue: h,
-          saturation: s,
-          lightness: l,
-        };
-      })
-    )
-    .select("id");
-
-  if (itemsError || !items) {
-    redirect(`/lookbooks?error=${encodeURIComponent("Failed to save sourced items")}`);
-  }
-
-  const { data: lookbook, error: lookbookError } = await supabase
-    .from("lookbooks")
-    .insert({
-      stylist_id: user.id,
-      title: spec.title,
-      description: spec.description,
-      client_id: clientId || null,
-    })
-    .select("id")
-    .single();
-
-  if (lookbookError || !lookbook) {
-    redirect(`/lookbooks?error=${encodeURIComponent("Failed to create lookbook")}`);
-  }
-
-  await supabase.from("lookbook_items").insert(
-    items.map((item, idx) => ({
-      lookbook_id: lookbook.id,
-      item_id: item.id,
-      note: prepared[idx]?.pick.note ?? "",
-      position: idx + 1,
-    }))
-  );
-
-  revalidatePath("/lookbooks");
-  revalidatePath("/items");
-  redirect(`/lookbooks/${lookbook.id}`);
 }
 
 export async function createLookbook(formData: FormData) {

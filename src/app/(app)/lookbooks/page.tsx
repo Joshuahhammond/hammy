@@ -64,20 +64,20 @@ export default async function LookbooksPage({ searchParams }: Props) {
           </select>
         </div>
         <div className="w-20">
-          <label htmlFor="ai-count" className="mb-1 block text-xs font-medium text-ink/70">
-            Pieces
+          <label htmlFor="ai-outfits" className="mb-1 block text-xs font-medium text-ink/70">
+            Outfits
           </label>
           <input
-            id="ai-count"
-            name="count"
+            id="ai-outfits"
+            name="outfits"
             type="number"
-            min={2}
-            max={12}
-            defaultValue={6}
+            min={1}
+            max={4}
+            defaultValue={2}
             className="w-full rounded-md border border-bone bg-white px-3 py-2 text-sm focus:border-taupe focus:outline-none"
           />
         </div>
-        <SubmitButton pendingLabel="Sourcing &amp; styling… (~1 min)">Generate lookbook</SubmitButton>
+        <SubmitButton pendingLabel="Starting…">Generate lookbook</SubmitButton>
       </form>
 
       <form

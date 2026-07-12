@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { groupIntoLooks, type LookItem } from "@/lib/looks";
+import { groupLookbookItems, type LookItem } from "@/lib/looks";
 import { LookBoard } from "@/components/look-board";
 import type { SharedLookbook } from "@/lib/types";
 
@@ -42,8 +42,9 @@ export default async function SharedLookbookPage({ params }: Props) {
     image_url: i.image_url,
     color_hex: i.color_hex,
     note: i.note,
+    look_no: i.look_no,
   }));
-  const looks = groupIntoLooks(items);
+  const looks = groupLookbookItems(items);
 
   return (
     <main className="min-h-screen bg-cream">

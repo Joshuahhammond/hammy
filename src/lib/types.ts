@@ -54,6 +54,7 @@ export type Lookbook = {
   title: string;
   description: string;
   share_token: string;
+  status: string; // 'ready' | 'generating' | 'error'
   created_at: string;
 };
 
@@ -80,6 +81,7 @@ export type SharedLookbook = {
     id: string;
     note: string;
     position: number;
+    look_no: number;
     name: string;
     brand: string;
     category: string;

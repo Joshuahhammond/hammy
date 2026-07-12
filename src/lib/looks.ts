@@ -13,7 +13,22 @@ export type LookItem = {
   image_url: string;
   color_hex: string;
   note: string;
+  /** explicit outfit number (0 = ungrouped legacy items) */
+  look_no?: number;
 };
+
+/** Group by explicit outfit numbers when present, else fall back to recipe */
+export function groupLookbookItems(items: LookItem[]): LookItem[][] {
+  const tagged = items.filter((i) => (i.look_no ?? 0) > 0);
+  if (tagged.length === 0) return groupIntoLooks(items);
+
+  const byNo = new Map<number, LookItem[]>();
+  for (const item of items) {
+    const no = item.look_no && item.look_no > 0 ? item.look_no : 999; // stragglers last
+    byNo.set(no, [...(byNo.get(no) ?? []), item]);
+  }
+  return [...byNo.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
+}
 
 export type Slot = {
   left: number; // percentages of the canvas
@@ -70,10 +85,12 @@ const HEAD_SLOTS: Record<number, Slot[]> = {
     { left: -2, top: 0, width: 48, height: 46, z: 3, rotate: 0 },
     { left: 40, top: 2, width: 46, height: 44, z: 2, rotate: 0 },
   ],
+  // Three garments cascade down the left edge with heavy overlap,
+  // leaving the center spine for accessories and the right for trousers
   3: [
-    { left: -3, top: 0, width: 40, height: 42, z: 3, rotate: 0 },
-    { left: 30, top: 2, width: 40, height: 42, z: 4, rotate: 0 },
-    { left: 63, top: 0, width: 40, height: 42, z: 2, rotate: 0 },
+    { left: -2, top: 0, width: 44, height: 40, z: 2, rotate: 0 },
+    { left: 1, top: 24, width: 42, height: 40, z: 3, rotate: 0 },
+    { left: -1, top: 48, width: 40, height: 38, z: 4, rotate: 0 },
   ],
 };
 
@@ -136,9 +153,11 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
   const bottoms = withImage.filter((i) => i.category === "bottoms").slice(0, 2);
   const shoes = withImage.filter((i) => i.category === "shoes").slice(0, 2);
   const noHeads = heads.length === 0;
+  // Left-fill only when the left flank is actually free (no trouser there,
+  // and no three-top cascade occupying it)
   const accSlots = noHeads
     ? ACC_SLOTS_NOHEAD
-    : bottoms.length < 2
+    : bottoms.length < 2 && heads.length < 3
       ? ACC_SLOTS_LEFTFILL
       : ACC_SLOTS;
   const accs = withImage

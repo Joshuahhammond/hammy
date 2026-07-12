@@ -9,6 +9,7 @@ import {
   deleteLookbook,
 } from "../actions";
 import { CopyButton } from "@/components/copy-button";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { formatPrice } from "@/lib/color";
 import type { Item, Lookbook, LookbookItem } from "@/lib/types";
 
@@ -30,6 +31,57 @@ export default async function LookbookDetailPage({ params }: Props) {
 
   const lookbook = lookbookRes.data;
   if (!lookbook) notFound();
+
+  if (lookbook.status === "generating") {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <AutoRefresh />
+        <Link href="/lookbooks" className="text-sm text-ink/60 hover:text-ink">
+          ← All lookbooks
+        </Link>
+        <div className="mt-8 rounded-2xl bg-white p-10 text-center ring-1 ring-bone">
+          <p className="text-xs font-medium uppercase tracking-[0.3em] text-taupe-dark">
+            ✦ Your stylist is working
+          </p>
+          <h1 className="mt-4 font-serif text-3xl font-medium italic text-ink">
+            Styling in progress…
+          </h1>
+          <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-ink/60">
+            Researching trends, designing the outfits, and sourcing each piece
+            from the stores. This takes 2–4 minutes — the page refreshes itself,
+            and it&apos;s safe to leave and come back.
+          </p>
+          <p className="mt-6 font-serif text-sm italic text-ink/50">&ldquo;{lookbook.description}&rdquo;</p>
+          <div className="mx-auto mt-8 flex justify-center gap-1.5">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-taupe" />
+            <span className="h-2 w-2 animate-pulse rounded-full bg-taupe [animation-delay:200ms]" />
+            <span className="h-2 w-2 animate-pulse rounded-full bg-taupe [animation-delay:400ms]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (lookbook.status === "error") {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Link href="/lookbooks" className="text-sm text-ink/60 hover:text-ink">
+          ← All lookbooks
+        </Link>
+        <div className="mt-8 rounded-2xl bg-white p-8 ring-1 ring-bone">
+          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {lookbook.description || "Generation failed."}
+          </p>
+          <form action={deleteLookbook} className="mt-4">
+            <input type="hidden" name="id" value={lookbook.id} />
+            <button type="submit" className="text-xs font-medium text-red-600 hover:underline">
+              Delete and try again
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const entries = (entriesRes.data ?? []) as LookbookItem[];
   const library = (libraryRes.data ?? []) as Item[];

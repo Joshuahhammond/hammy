@@ -16,42 +16,51 @@ const CELEB_STYLIST_SYSTEM =
   "sunglasses, bag, jewelry. You think in silhouettes, proportions, and a tight color story. " +
   "You know current runway and street-style trends and reference them.";
 
-const OutfitSpecSchema = z.object({
+const PieceSchema = z.object({
+  role: z
+    .string()
+    .describe("The piece's role in its outfit: 'top', 'trouser', 'shoes', 'belt', 'sunglasses', 'bag', 'outerwear', ..."),
+  category: z.enum(CATEGORIES),
+  description: z
+    .string()
+    .describe("Precise designer spec: silhouette, fabric, color, details — e.g. 'oversized chocolate suede belted blazer, strong shoulder'"),
+  color_hex: z.string().describe("The piece's intended color as 6-digit hex"),
+  keywords: z
+    .array(z.string())
+    .describe("3-5 lowercase single-word search stems for finding this piece in store catalogs (e.g. 'blazer', 'suede', 'chocolate')"),
+});
+
+const LookbookDesignSchema = z.object({
   title: z.string().describe("Evocative lookbook title, 2-6 words"),
   description: z
     .string()
     .describe("One or two sentences introducing the collection to the client, in the stylist's voice"),
-  pieces: z
+  outfits: z
     .array(
       z.object({
-        role: z
-          .string()
-          .describe("The piece's role in the look: 'top', 'second top', 'trouser', 'shoes', 'belt', 'sunglasses', 'bag', 'outerwear', ..."),
-        category: z.enum(CATEGORIES),
-        description: z
-          .string()
-          .describe("Precise designer spec: silhouette, fabric, color, details — e.g. 'oversized chocolate suede belted blazer, strong shoulder'"),
-        color_hex: z.string().describe("The piece's intended color as 6-digit hex"),
-        keywords: z
-          .array(z.string())
-          .describe("3-5 lowercase single-word search stems for finding this piece in store catalogs (e.g. 'blazer', 'suede', 'chocolate')"),
+        name: z.string().describe("Short outfit name, e.g. 'Gallery Morning'"),
+        pieces: z
+          .array(PieceSchema)
+          .describe(
+            "5-8 pieces forming this COMPLETE outfit: top(s), bottom (or dress), shoes, and 1-3 finishing accessories (belt, sunglasses, bag); outerwear when it belongs"
+          ),
       })
     )
-    .describe(
-      "7-10 pieces forming a COMPLETE look: at least one top, one bottom, one pair of shoes, and 2-3 finishing accessories (belt, sunglasses, bag). Outerwear when the brief calls for it."
-    ),
+    .describe("Distinct complete outfits, each wearable as-is, all within one cohesive style story"),
 });
 
-export type OutfitSpec = z.infer<typeof OutfitSpecSchema>;
+export type LookbookDesign = z.infer<typeof LookbookDesignSchema>;
 
 /**
- * Design phase: a trend-informed, head-to-toe outfit plan. Searches the web
- * for current editorial/street-style inspiration first, then specs each piece.
+ * Design phase: a trend-informed COLLECTION of complete outfits — like a
+ * stylist's client deck, each look head-to-toe with accessories. Searches
+ * the web for current editorial inspiration first.
  */
-export async function designOutfit(
+export async function designLookbook(
   brief: string,
-  clientName: string | null
-): Promise<OutfitSpec> {
+  clientName: string | null,
+  outfitCount: number
+): Promise<LookbookDesign> {
   const forClient = clientName ? ` The client's name is ${clientName}.` : "";
   let prose = "";
   try {
@@ -63,7 +72,7 @@ export async function designOutfit(
       messages: [
         {
           role: "user",
-          content: `Design a complete lookbook for this brief: "${brief}".${forClient}\n\nFirst, search the web briefly for what's trending right now in this aesthetic (street style, Pinterest-type editorial, runway) and let it inform the design. Then write the design: a short vision, and a numbered piece list (7-10 pieces) covering the FULL look — top(s), bottom(s), shoes, and 2-3 finishing accessories like a belt, sunglasses, or a bag; outerwear if it belongs. For each piece give silhouette, fabric, exact color, and the search words a buyer would use.`,
+          content: `Design a client lookbook of ${outfitCount} distinct, complete outfits for this brief: "${brief}".${forClient}\n\nFirst, search the web briefly for what's trending right now in this aesthetic (street style, Pinterest-type editorial, runway) and let it inform the design. Then write the design: a short collection vision, then each outfit as a named look with a numbered piece list (5-8 pieces) covering the FULL outfit — top(s), bottom or dress, shoes, and 1-3 finishing accessories like a belt, sunglasses, or a bag; outerwear if it belongs. The outfits must be distinct from each other but cohesive as one collection. For each piece give silhouette, fabric, exact color, and the search words a buyer would use.`,
         },
       ],
     });
@@ -83,13 +92,14 @@ export async function designOutfit(
       {
         role: "user",
         content: prose
-          ? `Structure this outfit design into the schema, keeping every piece:\n\n${prose}`
-          : `Design a complete lookbook for this brief: "${brief}".${forClient} Cover the FULL look — top(s), bottom(s), shoes, and 2-3 finishing accessories (belt, sunglasses, bag); outerwear if it belongs.`,
+          ? `Structure this lookbook design into the schema, keeping every outfit and every piece:\n\n${prose}`
+          : `Design a client lookbook of ${outfitCount} distinct, complete outfits for this brief: "${brief}".${forClient} Each outfit: top(s), bottom or dress, shoes, and 1-3 finishing accessories; outerwear if it belongs.`,
       },
     ],
-    output_config: { format: zodOutputFormat(OutfitSpecSchema) },
+    output_config: { format: zodOutputFormat(LookbookDesignSchema) },
   });
-  if (!response.parsed_output) throw new Error("Could not design the look");
+  if (!response.parsed_output || response.parsed_output.outfits.length === 0)
+    throw new Error("Could not design the collection");
   return response.parsed_output;
 }
 
@@ -355,7 +365,7 @@ export async function locateGarment(
             { type: "image" as const, source: { type: "url" as const, url: visionThumb(imageUrl) } },
             {
               type: "text" as const,
-              text: `Find the "${productName}" in this photo. Return a tight bounding box around ONLY that product as percentages of the image (0-100). Exclude the model's head/face entirely, and exclude body parts that aren't covered by the product. A little margin (2-3%) around the product is good.`,
+              text: `Find the "${productName}" in this photo. Return a tight bounding box around ONLY that product as percentages of the image (0-100). The box must NEVER include the model's face or head — start it at the shoulders/neckline (unless the product is headwear). Exclude body parts that aren't covered by the product. A little margin (2-3%) around the product is good.`,
             },
           ],
         },
@@ -364,6 +374,13 @@ export async function locateGarment(
     });
     const box = response.parsed_output;
     if (!box || box.width < 10 || box.height < 10) return null;
+    // Near-full-frame boxes on editorial shots tend to sneak the face in —
+    // nudge the top down to roughly chin height
+    if (box.top < 8 && box.height > 72) {
+      const trim = 10 - box.top;
+      box.top += trim;
+      box.height = Math.max(10, box.height - trim);
+    }
     return box;
   } catch {
     return null;
