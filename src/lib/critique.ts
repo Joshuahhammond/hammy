@@ -53,7 +53,7 @@ async function composeBoardPng(
       width: CANVAS_W,
       height: CANVAS_H,
       channels: 4,
-      background: { r: 244, g: 239, b: 230, alpha: 1 },
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
     },
   })
     .composite(layers)
@@ -152,7 +152,7 @@ export async function refineBoards(db: SupabaseClient, lookbookId: string): Prom
                 },
                 {
                   type: "text" as const,
-                  text: `This is a stylist's outfit collage. Items by number:\n${legend}\n\nYou are the final quality gate, not the designer — the layout engine already placed everything by its rules. Your ONLY tools: BENCH an item (removes it from the canvas; it stays in the product strip) and small nudges (±8%). Bench anything that ruins the board: an item sitting ON TOP of a garment's body, a duplicate accessory kind, a white photo-card rectangle, a garment so mis-scaled it reads as clutter. Nudge only to fix a small collision or close a small gap. Most boards need NOTHING — if it reads professional, set looks_professional=true with empty lists. Never try to redesign the composition.`,
+                  text: `This is a stylist's outfit collage. Items by number:\n${legend}\n\nYou are the final quality gate, not the designer — the layout engine already placed everything by its rules. Your ONLY tools: BENCH an item (removes it from the canvas; it stays in the product strip) and small nudges (±8%). Bench anything that ruins the board: an item sitting ON TOP of a garment's body, a duplicate accessory kind, a garment so mis-scaled it reads as clutter. Framed product cards and clean on-model torso fragments are part of this editorial collage language — do NOT bench those for being what they are. Nudge only to fix a small collision or close a small gap. Most boards need NOTHING — if it reads professional, set looks_professional=true with empty lists. Never try to redesign the composition.`,
                 },
               ],
             },

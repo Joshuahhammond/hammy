@@ -98,7 +98,7 @@ export function accKind(
     if (/bag|tote|clutch|crossbody|crescent|satchel|hobo/i.test(text)) return "bag" as const;
     if (/belt/i.test(text)) return "belt" as const;
     if (/sunglass|eyewear|frames|acetate/i.test(text)) return "sunglasses" as const;
-    if (/earring|necklace|ring|bracelet|hoop|pendant|choker|chain|watch|cuff|jewel/i.test(text)) return "jewelry" as const;
+    if (/earring|necklace|\brings?\b|bracelet|\bhoops?\b|pendant|choker|\bchains?\b|\bwatch(es)?\b|\bcuffs?\b(?!ed)|jewel/i.test(text)) return "jewelry" as const;
     return "other" as const;
   };
   // Three tiers: designed role (exact), then product title, then the
@@ -300,7 +300,9 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
 
   const placed: Array<{ item: LookItem; slot: Slot }> = [];
   const put = (item: LookItem | undefined, slot: Slot) => {
-    if (item) placed.push({ item, slot });
+    // Never place the same item twice: template cells claim items first,
+    // the anatomical pass only fills what no cell took
+    if (item && !placed.some((p) => p.item === item)) placed.push({ item, slot });
   };
 
   // ---- Template selection: pick the art-directed grid that places the
@@ -370,10 +372,10 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
         slots[bi].align = undefined;
       }
     }
-    // Templates place garments; accessories anchor anatomically below
-    assigned.forEach((item, i) => {
-      if (["head", "bottom", "dress"].includes(template!.slots[i].kind)) put(item, slots[i]);
-    });
+    // Templates place EVERYTHING they have a designed cell for — the cells
+    // were traced from reference boards precisely to fill gutters and
+    // corners. The anatomical pass below only fills kinds without a cell.
+    assigned.forEach((item, i) => put(item, slots[i]));
     return anchorAndScale();
   }
 
@@ -490,7 +492,7 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
       for (let k = 1; k < stack.length; k++) {
         const prev = stack[k - 1].slot;
         const cur = stack[k].slot;
-        cur.top = prev.top + prev.height * 0.62; // deep deliberate overlap
+        cur.top = prev.top + prev.height * 0.85; // ~15% occlusion, reference depth
         cur.left = prev.left + (k % 2 === 0 ? 2 : -2); // collar stagger
         cur.z = prev.z + 1; // lower shirt paints over the one above
       }
@@ -541,7 +543,17 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
             .map((r) => r.top + r.height)
         )
       : 40;
-    const hemY = botRect ? botRect.top + botRect.height : 78;
+    // Shoe floor: below EVERY garment on the board, not just the primary
+    // bottoms — shoes must never paint over any garment body
+    const allGarmentRects = [...heads, ...bottoms, ...dresses]
+      .map((g) => placed.find((p) => p.item === g)?.slot)
+      .filter((r): r is Slot => Boolean(r));
+    const garmentFloor = allGarmentRects.length
+      ? Math.max(...allGarmentRects.map((r) => r.top + r.height))
+      : 78;
+    const hemY = botRect
+      ? Math.max(botRect.top + botRect.height, garmentFloor - 6)
+      : Math.min(garmentFloor, 78);
 
     // The accessory SPINE: references run accessories down the widest
     // gutter between garment columns in dressing order — sunglasses,
@@ -733,10 +745,10 @@ export function autoscale(
     }
   }
   // Margin frame: reference boards keep a clean empty border — nothing
-  // ever touches or clips the canvas edge
+  // ever touches or clips the canvas edge (symmetric 3% all around)
   for (const { slot } of placed) {
     slot.left = Math.min(97 - slot.width, Math.max(3, slot.left));
-    slot.top = Math.min(98 - slot.height, Math.max(1.5, slot.top));
+    slot.top = Math.min(97 - slot.height, Math.max(3, slot.top));
   }
   return placed;
 }

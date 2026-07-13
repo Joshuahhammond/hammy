@@ -172,7 +172,9 @@ async function runLookbookGeneration({
     const GARMENT_TYPES: Array<[RegExp, RegExp]> = [
       [/skirt/i, /skirt/i],
       [/trouser|\bpants?\b|jeans?|denim|chino/i, /trouser|\bpants?\b|jeans?|chino/i],
-      [/\bshorts?\b/i, /\bshorts?\b/i],
+      // "short" must not match "Short Sleeve" — that one bug once flipped a
+      // shirt into the bottoms slot and broke an entire board's template
+      [/\bshorts\b|\bshort\b(?![ -]?sleeve)/i, /\bshorts\b|\bshort\b(?![ -]?sleeve)/i],
       [/dress|gown/i, /dress|gown/i],
       [/blazer|jacket|\bcoats?\b|trench|cardigan|overshirt/i, /blazer|jacket|\bcoats?\b|trench|cardigan|overshirt/i],
       [/\btops?\b|\btees?\b|shirt|blouse|knit|sweater|polo|tank|tunic|halter|cami|bodysuit/i,
@@ -267,11 +269,23 @@ async function runLookbookGeneration({
         continue;
       }
       const seen = seenPerOutfit.get(piece.outfit) ?? new Set<string>();
-      if (seen.has(product.url)) continue;
-      seen.add(product.url);
+      let finalProduct = product;
+      if (seen.has(product.url)) {
+        // Duplicate URL within the outfit — fall through to the piece's next
+        // candidate instead of silently dropping the piece (this silent drop
+        // was why designed jewelry never reached boards)
+        const alt = (poolByPiece.get(m.piece) ?? []).find((p) => !seen.has(p.url));
+        if (!alt) {
+          console.log(`[lookbook ${lookbookId}] dedupe drop (no alternate): ${piece.role}`);
+          continue;
+        }
+        console.log(`[lookbook ${lookbookId}] dedupe fallthrough: ${piece.role} → ${alt.title}`);
+        finalProduct = alt;
+      }
+      seen.add(finalProduct.url);
       seenPerOutfit.set(piece.outfit, seen);
       chosen.push({
-        product,
+        product: finalProduct,
         category: piece.category,
         color_hex: piece.color_hex,
         note: m.note,
@@ -281,7 +295,9 @@ async function runLookbookGeneration({
     }
     // Guaranteed fill: a designed piece the matcher dropped still gets its
     // best keyword candidate — a finished board beats a perfect match.
-    const matchedPieceIdx = new Set(matches.map((m) => m.piece));
+    // Survivor-based: pieces whose match was type-rejected or deduped away
+    // are ELIGIBLE for auto-fill (keying off raw matches barred them)
+    const matchedPieceIdx = new Set(chosen.map((c) => c.pieceIdx));
     flatPieces.forEach((piece, pi) => {
       if (matchedPieceIdx.has(pi)) return;
       // Garments keep the strict omit rule — only accessories/shoes auto-fill

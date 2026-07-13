@@ -22,34 +22,39 @@ export function LookBoard({ items, label }: { items: LookItem[]; label?: string 
 
       {placed.length > 0 && (
         <div
-          className={`relative isolate mx-auto w-full max-w-xl bg-[#f4efe6] ${
+          className={`relative isolate mx-auto w-full max-w-xl bg-white ${
             placed.length <= 2 ? "aspect-[3/2]" : "aspect-[4/5]"
           }`}
         >
-          {placed.map(({ item, slot }) => (
-            // Blend on the img itself: a wrapper div with z-index+transform
-            // creates a stacking context that ISOLATES mix-blend-multiply.
-            // Only card fallbacks blend; true cutouts occlude via z-order.
-            // eslint-disable-next-line @next/next/no-img-element -- retailer CDNs
-            <img
-              key={item.id}
-              src={item.image_url}
-              alt={item.name}
-              className={`absolute object-contain ${
-                /\.card\.png($|[?#])/.test(item.image_url) ? "mix-blend-multiply" : ""
-              }`}
-              style={{
-                left: `${slot.left}%`,
-                top: `${slot.top}%`,
-                width: `${slot.width}%`,
-                height: `${slot.height}%`,
-                zIndex: slot.z,
-                transform: slot.rotate ? `rotate(${slot.rotate}deg)` : undefined,
-                objectPosition: `${slot.alignX ?? "center"} ${slot.align ?? "center"}`,
-              }}
-              loading="lazy"
-            />
-          ))}
+          {placed.map(({ item, slot }) => {
+            const isCard = /\.card\.png($|[?#])/.test(item.image_url);
+            return (
+              // White canvas, H&S editorial: cutouts carry a whisper of
+              // drop-shadow so pale garments separate from the canvas;
+              // photo-cards render as framed cards — part of the collage
+              // language, not something to hide.
+              // eslint-disable-next-line @next/next/no-img-element -- retailer CDNs
+              <img
+                key={item.id}
+                src={item.image_url}
+                alt={item.name}
+                className={`absolute object-contain ${
+                  isCard ? "rounded-sm bg-white shadow-md ring-1 ring-ink/10" : ""
+                }`}
+                style={{
+                  left: `${slot.left}%`,
+                  top: `${slot.top}%`,
+                  width: `${slot.width}%`,
+                  height: `${slot.height}%`,
+                  zIndex: slot.z,
+                  transform: slot.rotate ? `rotate(${slot.rotate}deg)` : undefined,
+                  objectPosition: `${slot.alignX ?? "center"} ${slot.align ?? "center"}`,
+                  filter: isCard ? undefined : "drop-shadow(0 2px 4px rgba(27,23,21,0.10))",
+                }}
+                loading="lazy"
+              />
+            );
+          })}
         </div>
       )}
 
