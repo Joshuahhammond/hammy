@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { createClient as createSupabaseJs, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { hexToHsl } from "@/lib/color";
-import { planDiscovery, designLookbook, matchPiecesToProducts, pickBestImage, locateGarment, verifyPaletteMatches } from "@/lib/ai";
+import { planDiscovery, designLookbook, matchPiecesToProducts, pickBestImage, locateGarment, verifyPaletteMatches, verifyCutout } from "@/lib/ai";
 import { processProductImage } from "@/lib/images";
 import { probeAspect } from "@/lib/dims";
 import { isCutout } from "@/lib/looks";
@@ -216,6 +216,10 @@ async function runLookbookGeneration({
       }
       if (guards.length > 0) {
         candidates = candidates.filter((p) => guards.some((ok) => ok.test(productText(p))));
+        // Sport-specific footwear never belongs on a style board unless asked
+        if (/shoe|sneaker|loafer|sandal|boot/i.test(piece.role) && !/golf|cleat|hik/i.test(`${piece.role} ${piece.description}`)) {
+          candidates = candidates.filter((p) => !/golf|cleat|spike|soccer|football/i.test(productText(p)));
+        }
         // Keywords missed but the catalogs still hold real items of this
         // kind — better an off-keyword earring than none at all
         if (candidates.length === 0) {
@@ -439,11 +443,12 @@ async function runLookbookGeneration({
           if (crop) {
             // Deterministic face guards — the vision box sometimes covers
             // the whole body. A near-full-frame box is no crop at all;
-            // a full-length bottom's box must start at the waist.
-            if (crop.top < 10 && crop.height > 80) crop = null;
-            else if (isFullLengthBottom(pick.pieceIdx) && crop.top < 25) {
+            // a full-length bottom's box ALWAYS starts at the waist.
+            if (crop.top < 12 && crop.height > 75) crop = null;
+            else if (isFullLengthBottom(pick.pieceIdx)) {
               const bottomEdge = crop.top + crop.height;
-              crop = { ...crop, top: 34, height: Math.max(20, bottomEdge - 34) };
+              const top = Math.max(crop.top, 34);
+              crop = { ...crop, top, height: Math.max(20, bottomEdge - top) };
             }
           }
           if (!best.flat && !crop) {
@@ -453,6 +458,16 @@ async function runLookbookGeneration({
             return { pick, imageUrl: product.image };
           }
           let imageUrl = await processProductImage(chosenUrl, userId, db, crop, best.flat);
+          // Pixel-level gate on model crops: the ONLY place final cutout
+          // content is knowable. Faces, legs, props (a coffee cup, a coral
+          // ornament) get benched to the strip.
+          if (!best.flat && /\.model\.png/.test(imageUrl)) {
+            const clean = await verifyCutout(imageUrl, product.title);
+            if (!clean) {
+              console.log(`[lookbook ${lookbookId}] benched (dirty cutout): ${product.title}`);
+              return { pick, imageUrl: product.image };
+            }
+          }
           // Folded-shot guard: a full-length bottom whose cutout is wider
           // than tall is a folded stack — retry with another product photo
           if (isFullLengthBottom(pick.pieceIdx) && isCutout(imageUrl)) {

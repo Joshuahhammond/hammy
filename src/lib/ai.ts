@@ -424,6 +424,43 @@ export async function verifyPaletteMatches(
   return out;
 }
 
+const CutoutCleanSchema = z.object({
+  clean: z
+    .boolean()
+    .describe(
+      "true only if the cutout shows the product cleanly: no face, no bare legs or large skin areas beyond hands/forearms, no props or furniture, no second garment dominating"
+    ),
+});
+
+/**
+ * Final-pixel gate for on-model crops: the cutout is the only artifact
+ * whose content is actually knowable. Fail-open on API errors.
+ */
+export async function verifyCutout(imageUrl: string, productName: string): Promise<boolean> {
+  try {
+    const response = await client.messages.parse({
+      model: MODEL,
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image" as const, source: { type: "url" as const, url: imageUrl } },
+            {
+              type: "text" as const,
+              text: `This is a cutout destined for a stylist's collage, supposed to show only: "${productName}". Is it clean? A cropped torso wearing the garment is FINE (that's the editorial style). NOT clean: a visible face or head, bare legs/feet or large skin areas beyond hands and forearms, props or furniture (cups, plants, chairs, ornaments), or a different garment dominating the frame.`,
+            },
+          ],
+        },
+      ],
+      output_config: { format: zodOutputFormat(CutoutCleanSchema) },
+    });
+    return response.parsed_output?.clean ?? true;
+  } catch {
+    return true;
+  }
+}
+
 const GarmentBoxSchema = z.object({
   found: z
     .boolean()
