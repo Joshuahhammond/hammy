@@ -157,6 +157,27 @@ const TEMPLATES: Template[] = [
       { kind: "head", left: 66, top: 2, width: 32, height: 34, z: 4, rotate: 0, align: "bottom" },
       { kind: "bottom", left: 66, top: 38, width: 32, height: 54, z: 2, rotate: 0, align: "top" },
       { kind: "head", left: 37, top: 4, width: 24, height: 30, z: 3, rotate: 0, align: "bottom" },
+      { kind: "shoes", left: 36, top: 50, width: 26, height: 22, z: 6, rotate: 0, align: "top" },
+      { kind: "shoes", left: 5, top: 66, width: 28, height: 16, z: 5, rotate: 0, align: "top" },
+    ],
+  },
+  {
+    // Single-outfit two-column grid (traced from the H&S denim board):
+    // hero top left, bottoms as the right column, shoes stacked left,
+    // belt/jewelry on the center seam
+    id: "solo",
+    needs: { head: 1, bottom: 1, shoes: 1 },
+    pairs: [],
+    slots: [
+      { kind: "head", left: 3, top: 2, width: 44, height: 38, z: 4, rotate: 0, align: "bottom" },
+      { kind: "bottom", left: 58, top: 34, width: 40, height: 60, z: 2, rotate: 0, align: "top" },
+      { kind: "head", left: 56, top: 2, width: 40, height: 30, z: 3, rotate: 0, align: "bottom" },
+      { kind: "shoes", left: 6, top: 46, width: 27, height: 16, z: 5, rotate: 0, align: "bottom" },
+      { kind: "shoes", left: 8, top: 66, width: 26, height: 15, z: 5, rotate: 0, align: "top" },
+      { kind: "belt", left: 42, top: 44, width: 17, height: 11, z: 6, rotate: -6 },
+      { kind: "jewelry", left: 45, top: 6, width: 10, height: 12, z: 6, rotate: 0 },
+      { kind: "sunglasses", left: 44, top: 24, width: 14, height: 8, z: 6, rotate: -4 },
+      { kind: "bag", left: 74, top: 6, width: 20, height: 18, z: 5, rotate: 0 },
     ],
   },
   {
@@ -446,14 +467,18 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
         : bottoms.includes(p.item) ? "bottom"
         : dresses.includes(p.item) ? "dress" : null;
       if (!kind || !p.item.aspect) continue;
-      const [lo, hi] = BANDS[kind];
-      let target = Math.min(hi, Math.max(lo, p.slot.height));
-      // Wide pieces (shorts) hit their width cap before their height
-      // floor — never let banding blow an item past its column width
+      let [lo, hi] = BANDS[kind];
       const MAX_W: Record<string, number> = { head: 44, bottom: 44, dress: 42 };
+      let maxW = MAX_W[kind];
+      // Short/wide bottoms (shorts, minis) are NOT trousers — banding them
+      // to trouser heights inflates square shorts to full column width
+      if (kind === "bottom" && (p.item.aspect ?? 0) >= 0.8) {
+        lo = 18; hi = 34; maxW = 30;
+      }
+      let target = Math.min(hi, Math.max(lo, p.slot.height));
       const wouldW = p.slot.width * (target / p.slot.height);
-      if (wouldW > MAX_W[kind]) {
-        target = p.slot.height * (MAX_W[kind] / p.slot.width);
+      if (wouldW > maxW) {
+        target = p.slot.height * (maxW / p.slot.width);
       }
       if (Math.abs(target - p.slot.height) < 0.5) continue;
       const f = target / p.slot.height;
@@ -495,6 +520,20 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
         cur.top = prev.top + prev.height * 0.85; // ~15% occlusion, reference depth
         cur.left = prev.left + (k % 2 === 0 ? 2 : -2); // collar stagger
         cur.z = prev.z + 1; // lower shirt paints over the one above
+      }
+    }
+
+    // Hero dominance: the lead top scales up toward reference hero size
+    // (stack templates height-bind shirts on 4:5, collapsing the hierarchy)
+    const heroP = placed.find((p) => p.item === heads[0]);
+    if (heroP && heroP.item.aspect) {
+      const s = heroP.slot;
+      const f = Math.min(38 / s.width, 36 / s.height);
+      if (f > 1.02) {
+        const cx = s.left + s.width / 2;
+        s.width *= f;
+        s.height *= f;
+        s.left = cx - s.width / 2;
       }
     }
 
@@ -624,6 +663,17 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     );
     // Waist line: belt on the junction, in the bottoms' open lane
     put(belts[0], { left: spineLowX - 8, top: junctionY - 5, width: 16, height: 10, z: 8, rotate: -6 });
+    // Belt clearance: never start above the hem of a garment it overlaps
+    const beltP = placed.find((p) => p.item === belts[0]);
+    if (beltP) {
+      const s = beltP.slot;
+      for (const r of allGarmentRects) {
+        const xOver = Math.min(s.left + s.width, r.left + r.width) - Math.max(s.left, r.left);
+        if (xOver > s.width * 0.3 && r.top < s.top && r.top + r.height > s.top) {
+          s.top = r.top + r.height + 1;
+        }
+      }
+    }
     // Bottom of spine + under the primary hem: shoes in dressing order.
     // A legless primary column (its trousers live under another top) gets
     // its shoes right under the shirt hem, reference-style, not sunk to
@@ -643,7 +693,7 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
     // Third pair joins the footwear cluster below the first, like the
     // reference's center-bottom shoe cell — never stranded in a corner
     put(shoes[2], {
-      left: axis - 22, top: Math.min(hemY + 12, 80),
+      left: spineLowX - 12, top: Math.min(hemY + 12, 80),
       width: 26, height: 15, z: 7, rotate: 0, align: "top",
     });
     // Bag at hip height on whichever side of the bottoms has real room —
@@ -674,6 +724,24 @@ export function composeLook(items: LookItem[]): Array<{ item: LookItem; slot: Sl
       if (k === "belt" || k === "sunglasses") {
         if (seenKind.has(k)) placed.splice(i, 1);
         else seenKind.add(k);
+      }
+    }
+
+    // Orphan-accessory snap: an accessory floating well below its nearest
+    // garment pulls up to a slight hem overlap (no more stranded cuffs)
+    const garmentItems = new Set<LookItem>([...heads, ...bottoms, ...dresses]);
+    for (const p of placed) {
+      if (garmentItems.has(p.item)) continue;
+      const s = p.slot;
+      let nearestBottom = -Infinity;
+      for (const r of allGarmentRects) {
+        const xOver = Math.min(s.left + s.width, r.left + r.width) - Math.max(s.left, r.left);
+        if (xOver > s.width * 0.4 && r.top + r.height <= s.top) {
+          nearestBottom = Math.max(nearestBottom, r.top + r.height);
+        }
+      }
+      if (nearestBottom > 0 && s.top - nearestBottom > 4) {
+        s.top = nearestBottom - s.height * 0.15;
       }
     }
 
@@ -729,6 +797,24 @@ export function autoscale(
 ): Array<{ item: LookItem; slot: Slot }> {
   if (placed.length === 0) return placed;
   truthBoxes(placed);
+  // Vertical compaction: close LARGE interior gaps (>6%) between an item
+  // and whatever sits above it in the same column, leaving designed 2-4%
+  // gutters and intentional overlaps untouched. Extent-bound scaling
+  // alone can't fix a void in the middle of the board.
+  const byTop = [...placed].sort((a, b) => a.slot.top - b.slot.top);
+  for (const p of byTop) {
+    const s = p.slot;
+    let above = -Infinity;
+    for (const q of byTop) {
+      if (q === p) continue;
+      const r = q.slot;
+      const xOver = Math.min(s.left + s.width, r.left + r.width) - Math.max(s.left, r.left);
+      if (xOver > 0.4 * Math.min(s.width, r.width) && r.top + r.height <= s.top) {
+        above = Math.max(above, r.top + r.height);
+      }
+    }
+    if (above > 0 && s.top - above > 6) s.top = above + 2;
+  }
   const minL = Math.min(...placed.map(({ slot }) => slot.left));
   const maxR = Math.max(...placed.map(({ slot }) => slot.left + slot.width));
   const minT = Math.min(...placed.map(({ slot }) => slot.top));

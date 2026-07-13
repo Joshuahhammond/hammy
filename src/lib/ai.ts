@@ -55,7 +55,7 @@ const LookbookDesignSchema = z.object({
         pieces: z
           .array(PieceSchema)
           .describe(
-            "8-14 pieces forming this COMPLETE, abundant outfit. MANDATORY per outfit: top(s) or a dress, a bottom (unless dress-led), shoes, a bag, AND at least two finishing accessories from belt / sunglasses / earrings / necklace / bracelet. Outerwear when it belongs. If the brief enumerates specific pieces, include EVERY listed piece — it's an exact recreation. Editorial collages feel generous — never sparse."
+            "8-14 pieces forming this COMPLETE, abundant outfit. MANDATORY per outfit: TWO tops (a hero and an alternate — references always show a second option) or a dress plus a top, a bottom (unless dress-led), TWO shoe options, a bag, AND at least two finishing accessories from belt / sunglasses / earrings / necklace / bracelet. Outerwear when it belongs. If the brief enumerates specific pieces, include EVERY listed piece — it's an exact recreation. Editorial collages feel generous — never sparse."
           ),
       })
     )
@@ -85,7 +85,7 @@ export async function designLookbook(
       messages: [
         {
           role: "user",
-          content: `Design a client lookbook of ${outfitCount} distinct, complete outfits for this brief: "${brief}".${forClient}\n\nFirst, search the web briefly for what's trending right now in this aesthetic (street style, Pinterest-type editorial, runway) and let it inform the design. Then write the design: a short collection vision that OPENS BY NAMING THE PALETTE (e.g. "chocolate / cream / tan + gold"), then each outfit as a named look with a numbered piece list of 8-14 pieces. If the brief enumerates specific pieces, include EVERY listed piece — the client wants an exact recreation. Every piece's color must come from the named palette. Every outfit MUST be head-to-toe AND fully finished: top(s) or a dress, a bottom (unless dress-led), shoes, a bag, and at least two more finishing accessories (belt, sunglasses, earrings, necklace, bracelet); outerwear if it belongs. Editorial boards feel abundant — never sparse. The outfits must be distinct from each other but cohesive as one collection. For each piece give silhouette, fabric, exact color, and the search words a buyer would use.`,
+          content: `Design a client lookbook of ${outfitCount} distinct, complete outfits for this brief: "${brief}".${forClient}\n\nFirst, search the web briefly for what's trending right now in this aesthetic (street style, Pinterest-type editorial, runway) and let it inform the design. Then write the design: a short collection vision that OPENS BY NAMING THE PALETTE (e.g. "chocolate / cream / tan + gold"), then each outfit as a named look with a numbered piece list of 8-14 pieces. If the brief enumerates specific pieces, include EVERY listed piece — the client wants an exact recreation. Every piece's color must come from the named palette. Every outfit MUST be head-to-toe AND fully finished: TWO tops (a hero and an alternate) or a dress plus a top, a bottom (unless dress-led), TWO shoe options, a bag, and at least two more finishing accessories (belt, sunglasses, earrings, necklace, bracelet); outerwear if it belongs. Editorial boards feel abundant — never sparse. The outfits must be distinct from each other but cohesive as one collection. For each piece give silhouette, fabric, exact color, and the search words a buyer would use.`,
         },
       ],
     });
@@ -106,7 +106,7 @@ export async function designLookbook(
         role: "user",
         content: prose
           ? `Structure this lookbook design into the schema, keeping every outfit and every piece:\n\n${prose}`
-          : `Design a client lookbook of ${outfitCount} distinct, complete outfits for this brief: "${brief}".${forClient} Each outfit 8-11 pieces, head-to-toe and fully finished: top(s) or dress, bottom, shoes, a bag, and at least two more accessories (belt, sunglasses, jewelry); outerwear if it belongs.`,
+          : `Design a client lookbook of ${outfitCount} distinct, complete outfits for this brief: "${brief}".${forClient} Each outfit 8-14 pieces, head-to-toe and fully finished: TWO tops or dress plus top, bottom, TWO shoe options, a bag, and at least two more accessories (belt, sunglasses, jewelry); outerwear if it belongs.`,
       },
     ],
     output_config: { format: zodOutputFormat(LookbookDesignSchema) },
@@ -318,10 +318,13 @@ export type BestImage = { index: number; flat: boolean };
  * white collage, and report whether it's a true product-only shot. Items
  * without a flat shot stay off the collage canvas.
  */
-const PICK_PROMPT =
-  "These are photos of ONE clothing product, labeled Image 0..N. Pick the best photo to cut out for a stylist's editorial collage. Preference order: (1) ghost/invisible-mannequin shot, (2) flat-lay, (3) plain product still, (4) a clean front-facing on-model torso shot — a legitimate editorial choice for hero garments, not a last resort. Requirements: full garment visible, front-facing, uncropped. REJECT fabric/detail close-ups, back views, packaging, and any image whose color/pattern differs from Image 0 (variant colorways). NEVER pick a folded or stacked garment when any unfolded view exists — folded shots read as squares on a collage. Ties go to the lower index. Set flat=true only if the chosen image shows the product with no person wearing it; treat a visible mannequin with limbs, head, or torso the same as a model (flat=false). If every image has a model, pick the plainest, most frontal full-body one and set flat=false.";
+const PICK_PROMPT_HERO =
+  "These are photos of ONE clothing product, labeled Image 0..N. Pick the best photo for the HERO of a stylist's editorial collage. Preference order: (1) a clean front-facing on-model torso shot, head cropped or croppable — the editorial hero treatment references lead with, (2) ghost/invisible-mannequin, (3) flat-lay, (4) plain product still. For shoes prefer top-down or angled PAIR shots over single side-profile shoes.";
 
-async function pickFrom(imageUrls: string[]): Promise<BestImage | null> {
+const PICK_PROMPT =
+  "These are photos of ONE clothing product, labeled Image 0..N. Pick the best photo to cut out for a stylist's editorial collage. Preference order: (1) ghost/invisible-mannequin shot, (2) flat-lay, (3) plain product still, (4) a clean front-facing on-model torso shot — a legitimate editorial choice for hero garments, not a last resort. For shoes prefer top-down or angled PAIR shots over single side-profile shoes. Requirements: full garment visible, front-facing, uncropped. REJECT fabric/detail close-ups, back views, packaging, and any image whose color/pattern differs from Image 0 (variant colorways). NEVER pick a folded or stacked garment when any unfolded view exists — folded shots read as squares on a collage. Ties go to the lower index. Set flat=true only if the chosen image shows the product with no person wearing it; treat a visible mannequin with limbs, head, or torso the same as a model (flat=false). If every image has a model, pick the plainest, most frontal full-body one and set flat=false.";
+
+async function pickFrom(imageUrls: string[], hero = false): Promise<BestImage | null> {
   const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 2048,
@@ -337,7 +340,7 @@ async function pickFrom(imageUrls: string[]): Promise<BestImage | null> {
               source: { type: "url" as const, url: visionThumb(url) },
             },
           ]),
-          { type: "text" as const, text: PICK_PROMPT },
+          { type: "text" as const, text: hero ? PICK_PROMPT_HERO : PICK_PROMPT },
         ],
       },
     ],
@@ -351,15 +354,15 @@ async function pickFrom(imageUrls: string[]): Promise<BestImage | null> {
   };
 }
 
-export async function pickBestImage(imageUrls: string[]): Promise<BestImage> {
+export async function pickBestImage(imageUrls: string[], hero = false): Promise<BestImage> {
   if (imageUrls.length === 0) return { index: 0, flat: false };
   try {
-    return (await pickFrom(imageUrls)) ?? { index: 0, flat: false };
+    return (await pickFrom(imageUrls, hero)) ?? { index: 0, flat: false };
   } catch {
     // One dead deep URL shouldn't dump the item into the worst on-model
     // path — retry judging just the primary image before giving up.
     try {
-      return (await pickFrom([imageUrls[0]])) ?? { index: 0, flat: false };
+      return (await pickFrom([imageUrls[0]], hero)) ?? { index: 0, flat: false };
     } catch {
       return { index: 0, flat: false };
     }

@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { hexToHsl } from "@/lib/color";
 import { planDiscovery, designLookbook, matchPiecesToProducts, pickBestImage, locateGarment, verifyPaletteMatches } from "@/lib/ai";
 import { processProductImage } from "@/lib/images";
+import { probeAspect } from "@/lib/dims";
+import { isCutout } from "@/lib/looks";
 import { SOURCES, sourceById } from "@/lib/sources";
 import { fetchStoreProducts, filterByKeywords } from "@/lib/shopify";
 
@@ -406,14 +408,32 @@ async function runLookbookGeneration({
       `[lookbook ${lookbookId}] matched ${typed.length}/${flatPieces.length} designed pieces (${matches.length} raw matches, ${chosen.length - kept.length} palette drops)`
     );
 
-    // 4. Photos in small batches (bg removal is CPU-heavy)
+    // 4. Photos in small batches (bg removal is CPU-heavy). The first
+    // top/outerwear of each outfit is that look's HERO — it prefers a
+    // clean on-model torso shot, the editorial treatment references lead
+    // with. Everything else prefers ghost/flat.
+    const heroPieceByOutfit = new Map<number, number>();
+    for (const c of typed) {
+      if (
+        ["tops", "outerwear"].includes(c.category) &&
+        !heroPieceByOutfit.has(c.outfit)
+      ) {
+        heroPieceByOutfit.set(c.outfit, c.pieceIdx);
+      }
+    }
+    const isFullLengthBottom = (pieceIdx: number) => {
+      const p = flatPieces[pieceIdx];
+      const t = `${p?.role ?? ""} ${p?.description ?? ""}`;
+      return /trouser|\bpants?\b|jeans?/i.test(t) && !/\bshorts?\b/i.test(t);
+    };
     const prepared: Array<{ pick: (typeof typed)[number]; imageUrl: string }> = [];
     for (let i = 0; i < typed.length; i += 4) {
       const batch = await Promise.all(
         typed.slice(i, i + 4).map(async (pick) => {
           const { product } = pick;
           const imgs = product.images.length > 0 ? product.images : [product.image];
-          const best = await pickBestImage(imgs);
+          const hero = heroPieceByOutfit.get(pick.outfit) === pick.pieceIdx;
+          const best = await pickBestImage(imgs, hero);
           const chosenUrl = imgs[best.index] ?? product.image;
           const crop = best.flat ? null : await locateGarment(chosenUrl, product.title);
           if (!best.flat && !crop) {
@@ -422,7 +442,23 @@ async function runLookbookGeneration({
             console.log(`[lookbook ${lookbookId}] benched (no clean crop): ${product.title}`);
             return { pick, imageUrl: product.image };
           }
-          const imageUrl = await processProductImage(chosenUrl, userId, db, crop, best.flat);
+          let imageUrl = await processProductImage(chosenUrl, userId, db, crop, best.flat);
+          // Folded-shot guard: a full-length bottom whose cutout is wider
+          // than tall is a folded stack — retry with another product photo
+          if (isFullLengthBottom(pick.pieceIdx) && isCutout(imageUrl)) {
+            const ar = await probeAspect(imageUrl);
+            if (ar && ar > 0.6) {
+              const altUrl = imgs.find((_, idx) => idx !== best.index);
+              if (altUrl) {
+                const retry = await processProductImage(altUrl, userId, db, null, true);
+                const ar2 = isCutout(retry) ? await probeAspect(retry) : null;
+                if (ar2 && ar2 < ar) {
+                  console.log(`[lookbook ${lookbookId}] folded-shot retry kept: ${product.title}`);
+                  imageUrl = retry;
+                }
+              }
+            }
+          }
           return { pick, imageUrl };
         })
       );
